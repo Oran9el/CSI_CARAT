@@ -35,3 +35,21 @@ Expected cache outputs:
 /home/ccl/data/csi-carat/widar3/widar3g6d/cache/widar3-g6_csi_domain_train_cache.pkl
 /home/ccl/data/csi-carat/widar3/widar3g6d/cache/widar3-g6_csi_domain_test_cache.pkl
 ```
+
+Build cleaned/windowed Widar3.0-G6D caches:
+
+```bash
+python scripts/clean_widar3_g6d.py \
+  --data-root /home/ccl/data/csi-carat \
+  --split BOTH \
+  --target-packets 220 \
+  --window-size 128 \
+  --stride 64
+```
+
+Expected clean cache outputs:
+
+```text
+/home/ccl/data/csi-carat/widar3/widar3g6d/clean_cache/widar3-g6_clean_train_cache.pkl
+/home/ccl/data/csi-carat/widar3/widar3g6d/clean_cache/widar3-g6_clean_test_cache.pkl
+```

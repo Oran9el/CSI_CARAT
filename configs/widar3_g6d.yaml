@@ -11,6 +11,17 @@ preprocess:
   min_packets: 120
   max_packets: 220
 
+clean:
+  clean_cache_root: /home/ccl/data/csi-carat/widar3/widar3g6d/clean_cache
+  train_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/clean_cache/widar3-g6_clean_train_cache.pkl
+  test_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/clean_cache/widar3-g6_clean_test_cache.pkl
+  target_packets: 220
+  window_size: 128
+  stride: 64
+  hampel_window: 5
+  hampel_n_sigmas: 3.0
+  instance_normalize: true
+
 model:
   input_subcarriers: 30
   window_size: 220
