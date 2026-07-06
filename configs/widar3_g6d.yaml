@@ -6,6 +6,11 @@ data:
   train_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/cache/widar3-g6_csi_domain_train_cache.pkl
   test_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/cache/widar3-g6_csi_domain_test_cache.pkl
 
+preprocess:
+  split: BOTH
+  min_packets: 120
+  max_packets: 220
+
 model:
   input_subcarriers: 30
   window_size: 220
