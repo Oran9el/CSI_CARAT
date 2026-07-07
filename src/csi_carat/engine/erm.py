@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from csi_carat.metrics.classification import classification_summary
+from csi_carat.metrics.classification import classification_breakdown, classification_summary
 
 
 def train_one_erm_step(
@@ -64,7 +64,8 @@ def evaluate_erm(
     dataloader,
     device: torch.device | str = "cpu",
     num_classes: int = 6,
-) -> dict[str, float]:
+    include_breakdown: bool = False,
+) -> dict[str, object]:
     """Evaluate an amplitude-only ERM classifier."""
 
     model.eval()
@@ -90,10 +91,10 @@ def evaluate_erm(
     if total_examples == 0:
         raise RuntimeError("No batches were produced for ERM evaluation.")
 
-    summary = classification_summary(
-        y_true=torch.cat(targets, dim=0),
-        y_pred=torch.cat(predictions, dim=0),
-        domains=torch.cat(domains, dim=0),
-        num_classes=num_classes,
-    )
+    y_true = torch.cat(targets, dim=0)
+    y_pred = torch.cat(predictions, dim=0)
+    domain_ids = torch.cat(domains, dim=0)
+    summary = classification_summary(y_true, y_pred, domain_ids, num_classes=num_classes)
+    if include_breakdown:
+        summary.update(classification_breakdown(y_true, y_pred, domain_ids, num_classes=num_classes))
     return {"loss": total_loss / total_examples, **summary}

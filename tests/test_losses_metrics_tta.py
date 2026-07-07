@@ -3,7 +3,7 @@ import torch
 from csi_carat.losses.consistency import symmetric_kl
 from csi_carat.losses.disentangle import covariance_penalty
 from csi_carat.losses.risk import logsumexp_risk
-from csi_carat.metrics.classification import classification_summary
+from csi_carat.metrics.classification import classification_breakdown, classification_summary
 from csi_carat.models.carat import CsiCaratModel
 from csi_carat.tta.calibrator import collect_trainable_tta_parameters
 from csi_carat.tta.prototype_memory import PrototypeMemory
@@ -42,6 +42,23 @@ def test_classification_summary_reports_worst_domain_macro_f1():
         "domain_std_accuracy",
     }
     assert 0.0 <= summary["worst_domain_macro_f1"] <= 1.0
+
+
+def test_classification_breakdown_reports_per_domain_and_per_class_metrics():
+    y_true = torch.tensor([0, 1, 0, 1, 0, 1])
+    y_pred = torch.tensor([0, 1, 1, 1, 0, 0])
+    domains = torch.tensor([0, 0, 1, 1, 2, 2])
+
+    breakdown = classification_breakdown(y_true, y_pred, domains, num_classes=2)
+
+    assert set(breakdown) == {"per_class", "per_domain"}
+    assert breakdown["per_class"]["0"]["support"] == 3
+    assert breakdown["per_class"]["1"]["support"] == 3
+    assert 0.0 <= breakdown["per_class"]["0"]["f1"] <= 1.0
+    assert breakdown["per_domain"]["0"]["support"] == 2
+    assert breakdown["per_domain"]["1"]["support"] == 2
+    assert breakdown["per_domain"]["2"]["support"] == 2
+    assert 0.0 <= breakdown["per_domain"]["1"]["macro_f1"] <= 1.0
 
 
 def test_tta_parameter_selection_is_lightweight():

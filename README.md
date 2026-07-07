@@ -117,4 +117,4 @@ results/widar3_erm/amplitude_only_metrics.json
 results/widar3_erm/amplitude_only_metrics.md
 ```
 
-The checkpoint is written to `results/widar3_erm/amplitude_only_checkpoint.pt` and is ignored by Git.
+The metrics include final-epoch scores, best epochs by target accuracy / macro-F1 / worst-domain macro-F1, plus per-domain and per-class diagnostics at the best macro-F1 epoch. The checkpoint is written to `results/widar3_erm/amplitude_only_checkpoint.pt` and is ignored by Git.

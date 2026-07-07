@@ -25,6 +25,48 @@ def _macro_f1(y_true: torch.Tensor, y_pred: torch.Tensor, num_classes: int) -> f
     return float(sum(scores) / len(scores))
 
 
+def classification_breakdown(
+    y_true: torch.Tensor,
+    y_pred: torch.Tensor,
+    domains: torch.Tensor,
+    num_classes: int,
+) -> dict[str, dict[str, dict[str, float | int]]]:
+    """Compute JSON-friendly per-class and per-domain metrics."""
+
+    y_true = y_true.detach().cpu().long()
+    y_pred = y_pred.detach().cpu().long()
+    domains = domains.detach().cpu().long()
+
+    per_class = {}
+    for cls in range(num_classes):
+        mask_true = y_true == cls
+        mask_pred = y_pred == cls
+        true_positive = int((mask_true & mask_pred).sum().item())
+        false_positive = int((~mask_true & mask_pred).sum().item())
+        false_negative = int((mask_true & ~mask_pred).sum().item())
+        precision = _safe_divide(true_positive, true_positive + false_positive)
+        recall = _safe_divide(true_positive, true_positive + false_negative)
+        f1 = _safe_divide(2 * precision * recall, precision + recall)
+        per_class[str(cls)] = {
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "support": int(mask_true.sum().item()),
+        }
+
+    per_domain = {}
+    for domain in torch.unique(domains):
+        domain_id = int(domain.item())
+        mask = domains == domain
+        per_domain[str(domain_id)] = {
+            "accuracy": _accuracy(y_true[mask], y_pred[mask]),
+            "macro_f1": _macro_f1(y_true[mask], y_pred[mask], num_classes),
+            "support": int(mask.sum().item()),
+        }
+
+    return {"per_class": per_class, "per_domain": per_domain}
+
+
 def classification_summary(
     y_true: torch.Tensor,
     y_pred: torch.Tensor,
@@ -54,3 +96,9 @@ def classification_summary(
         if domain_acc
         else 0.0,
     }
+
+
+def _safe_divide(numerator: float, denominator: float) -> float:
+    if denominator == 0:
+        return 0.0
+    return float(numerator / denominator)

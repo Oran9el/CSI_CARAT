@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import random
 from pathlib import Path
@@ -77,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     history: list[dict[str, Any]] = []
+    best_state_dict: dict[str, torch.Tensor] | None = None
+    best_macro_f1 = -1.0
     for epoch in range(1, args.epochs + 1):
         train_metrics = run_erm_epoch(
             model,
@@ -85,9 +88,20 @@ def main(argv: list[str] | None = None) -> int:
             device=args.device,
             max_steps=args.max_steps_per_epoch,
         )
-        test_metrics = evaluate_erm(model, test_loader, device=args.device, num_classes=6)
+        test_metrics = evaluate_erm(
+            model,
+            test_loader,
+            device=args.device,
+            num_classes=6,
+            include_breakdown=True,
+        )
         record = {"epoch": epoch, "train": train_metrics, "test": test_metrics}
         history.append(record)
+        if float(test_metrics["macro_f1"]) > best_macro_f1:
+            best_macro_f1 = float(test_metrics["macro_f1"])
+            best_state_dict = copy.deepcopy(
+                {key: value.detach().cpu() for key, value in model.state_dict().items()}
+            )
         print(
             "epoch={epoch} train_loss={train_loss:.6f} test_acc={test_acc:.4f} "
             "test_macro_f1={test_f1:.4f} worst_domain_acc={worst_acc:.4f}".format(
@@ -114,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         "args": vars(args),
         "history": history,
         "final": history[-1],
+        "best": summarize_best_epochs(history),
     }
     _write_json(metrics_path, payload)
     _write_markdown(report_path, payload)
@@ -122,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         torch.save(
             {
                 "model_state_dict": model.state_dict(),
+                "best_model_state_dict": best_state_dict,
                 "optimizer_state_dict": optimizer.state_dict(),
                 "metrics": payload,
             },
@@ -146,10 +162,28 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def select_best_epoch(history: list[dict[str, Any]], metric: str) -> dict[str, Any]:
+    """Return the epoch record with the highest target-test metric."""
+
+    if not history:
+        raise ValueError("Cannot select best epoch from an empty history.")
+    return max(history, key=lambda record: float(record["test"][metric]))
+
+
+def summarize_best_epochs(history: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Summarize best epochs for average and worst-domain target metrics."""
+
+    return {
+        metric: select_best_epoch(history, metric)
+        for metric in ("accuracy", "macro_f1", "worst_domain_macro_f1")
+    }
+
+
 def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
     final = payload["final"]
     train = final["train"]
     test = final["test"]
+    best = payload["best"]
     lines = [
         "# Widar3 ERM Baseline",
         "",
@@ -170,11 +204,58 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
             f"{test['domain_std_accuracy']:.6f} |"
         ),
         "",
-        "## Epochs",
+        "## Best Epochs",
         "",
-        "| epoch | train_loss | test_accuracy | test_macro_f1 | worst_domain_accuracy |",
-        "| ---: | ---: | ---: | ---: | ---: |",
+        "| metric | epoch | test_loss | accuracy | macro_f1 | worst_domain_macro_f1 |",
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
     ]
+    for metric_name, record in best.items():
+        record_test = record["test"]
+        lines.append(
+            (
+                f"| {metric_name} | {record['epoch']} | {record_test['loss']:.6f} | "
+                f"{record_test['accuracy']:.6f} | {record_test['macro_f1']:.6f} | "
+                f"{record_test['worst_domain_macro_f1']:.6f} |"
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Per-Domain Metrics At Best Macro-F1",
+            "",
+            "| domain | support | accuracy | macro_f1 |",
+            "| ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for domain, values in best["macro_f1"]["test"]["per_domain"].items():
+        lines.append(
+            f"| {domain} | {values['support']} | {values['accuracy']:.6f} | {values['macro_f1']:.6f} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Per-Class Metrics At Best Macro-F1",
+            "",
+            "| class | support | precision | recall | f1 |",
+            "| ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for class_id, values in best["macro_f1"]["test"]["per_class"].items():
+        lines.append(
+            (
+                f"| {class_id} | {values['support']} | {values['precision']:.6f} | "
+                f"{values['recall']:.6f} | {values['f1']:.6f} |"
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Epochs",
+            "",
+            "| epoch | train_loss | test_accuracy | test_macro_f1 | worst_domain_accuracy |",
+            "| ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
     for record in payload["history"]:
         lines.append(
             "| {epoch} | {train_loss:.6f} | {test_acc:.6f} | {test_f1:.6f} | {worst_acc:.6f} |".format(

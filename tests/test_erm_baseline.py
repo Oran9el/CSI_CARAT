@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 
 from csi_carat.engine.erm import evaluate_erm, run_erm_epoch, train_one_erm_step
 from csi_carat.models.baselines import AmplitudeCnnClassifier
+from scripts.train_widar3_erm_baseline import select_best_epoch, summarize_best_epochs
 
 
 def test_amplitude_cnn_classifier_forward_shape():
@@ -69,3 +70,40 @@ def test_evaluate_erm_returns_classification_metrics():
     }
     assert metrics["loss"] > 0
     assert 0.0 <= metrics["accuracy"] <= 1.0
+
+
+def test_evaluate_erm_can_return_diagnostic_breakdown():
+    model = AmplitudeCnnClassifier(num_subcarriers=3, window_size=16, num_classes=6)
+    loader = _make_dict_loader(batch_size=2)
+
+    metrics = evaluate_erm(model, loader, num_classes=6, include_breakdown=True)
+
+    assert "per_class" in metrics
+    assert "per_domain" in metrics
+    assert metrics["per_domain"]["0"]["support"] == 2
+    assert metrics["per_domain"]["1"]["support"] == 2
+
+
+def test_select_best_epoch_uses_requested_test_metric():
+    history = [
+        {"epoch": 1, "test": {"accuracy": 0.20, "macro_f1": 0.30, "worst_domain_macro_f1": 0.10}},
+        {"epoch": 2, "test": {"accuracy": 0.40, "macro_f1": 0.25, "worst_domain_macro_f1": 0.15}},
+        {"epoch": 3, "test": {"accuracy": 0.35, "macro_f1": 0.45, "worst_domain_macro_f1": 0.12}},
+    ]
+
+    assert select_best_epoch(history, "accuracy")["epoch"] == 2
+    assert select_best_epoch(history, "macro_f1")["epoch"] == 3
+
+
+def test_summarize_best_epochs_tracks_average_and_worst_domain_metrics():
+    history = [
+        {"epoch": 1, "test": {"accuracy": 0.20, "macro_f1": 0.30, "worst_domain_macro_f1": 0.10}},
+        {"epoch": 2, "test": {"accuracy": 0.40, "macro_f1": 0.25, "worst_domain_macro_f1": 0.15}},
+        {"epoch": 3, "test": {"accuracy": 0.35, "macro_f1": 0.45, "worst_domain_macro_f1": 0.12}},
+    ]
+
+    summary = summarize_best_epochs(history)
+
+    assert summary["accuracy"]["epoch"] == 2
+    assert summary["macro_f1"]["epoch"] == 3
+    assert summary["worst_domain_macro_f1"]["epoch"] == 2
