@@ -1,0 +1,201 @@
+{
+  "args": {
+    "batch_size": 256,
+    "data_root": "/home/ccl/data/csi-carat",
+    "device": "cuda",
+    "epochs": 10,
+    "learning_rate": 0.001,
+    "max_steps_per_epoch": 0,
+    "no_checkpoint": false,
+    "num_workers": 2,
+    "output_dir": "results/widar3_erm",
+    "run_name": "amplitude_only",
+    "seed": 3407,
+    "test_cache": "",
+    "train_cache": "",
+    "weight_decay": 0.0001
+  },
+  "final": {
+    "epoch": 10,
+    "test": {
+      "accuracy": 0.33164548873901367,
+      "domain_std_accuracy": 0.04499778896570206,
+      "loss": 1.5792784433359843,
+      "macro_f1": 0.341409166653951,
+      "worst_domain_accuracy": 0.21155427396297455,
+      "worst_domain_macro_f1": 0.09874109756977607
+    },
+    "train": {
+      "examples": 48964,
+      "loss": 1.2382657826019847,
+      "steps": 192
+    }
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "test": {
+        "accuracy": 0.3668120205402374,
+        "domain_std_accuracy": 0.08967337757349014,
+        "loss": 1.4671936299980493,
+        "macro_f1": 0.36398495951046544,
+        "worst_domain_accuracy": 0.11800986528396606,
+        "worst_domain_macro_f1": 0.07972898512768249
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.4894782035883107,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 2,
+      "test": {
+        "accuracy": 0.3546947240829468,
+        "domain_std_accuracy": 0.07330525666475296,
+        "loss": 1.6216838253344807,
+        "macro_f1": 0.32799382756153744,
+        "worst_domain_accuracy": 0.1511102020740509,
+        "worst_domain_macro_f1": 0.09195587458088994
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.3802857054729942,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 3,
+      "test": {
+        "accuracy": 0.25400984287261963,
+        "domain_std_accuracy": 0.07757022976875305,
+        "loss": 2.598905488596597,
+        "macro_f1": 0.22213797767957053,
+        "worst_domain_accuracy": 0.027549341320991516,
+        "worst_domain_macro_f1": 0.02586465949813525
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.3457019073921679,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 4,
+      "test": {
+        "accuracy": 0.3661973774433136,
+        "domain_std_accuracy": 0.0856647938489914,
+        "loss": 1.5606688961159016,
+        "macro_f1": 0.38855727513631183,
+        "worst_domain_accuracy": 0.13096217811107635,
+        "worst_domain_macro_f1": 0.10030149854719639
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.3276091586159644,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 5,
+      "test": {
+        "accuracy": 0.2814640402793884,
+        "domain_std_accuracy": 0.022763360291719437,
+        "loss": 2.5782369703555115,
+        "macro_f1": 0.20082282458073072,
+        "worst_domain_accuracy": 0.2409539520740509,
+        "worst_domain_macro_f1": 0.11603837211926778
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.3094989015876677,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 6,
+      "test": {
+        "accuracy": 0.3011619746685028,
+        "domain_std_accuracy": 0.028426986187696457,
+        "loss": 2.026827646936123,
+        "macro_f1": 0.274637429897363,
+        "worst_domain_accuracy": 0.2525748014450073,
+        "worst_domain_macro_f1": 0.1297745139648517
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.2970558211417986,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 7,
+      "test": {
+        "accuracy": 0.2485072910785675,
+        "domain_std_accuracy": 0.025297101587057114,
+        "loss": 2.510166692303207,
+        "macro_f1": 0.21461846493184566,
+        "worst_domain_accuracy": 0.19676584005355835,
+        "worst_domain_macro_f1": 0.11551495051632325
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.2803517761363692,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 8,
+      "test": {
+        "accuracy": 0.28544458746910095,
+        "domain_std_accuracy": 0.028731010854244232,
+        "loss": 2.00478980346955,
+        "macro_f1": 0.25426290060083073,
+        "worst_domain_accuracy": 0.23108552396297455,
+        "worst_domain_macro_f1": 0.12342197230706613
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.26447688309101,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 9,
+      "test": {
+        "accuracy": 0.2922495901584625,
+        "domain_std_accuracy": 0.08392274379730225,
+        "loss": 2.1322910000413597,
+        "macro_f1": 0.2702939386169116,
+        "worst_domain_accuracy": 0.061266448348760605,
+        "worst_domain_macro_f1": 0.03035299099671344
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.2558878914280154,
+        "steps": 192
+      }
+    },
+    {
+      "epoch": 10,
+      "test": {
+        "accuracy": 0.33164548873901367,
+        "domain_std_accuracy": 0.04499778896570206,
+        "loss": 1.5792784433359843,
+        "macro_f1": 0.341409166653951,
+        "worst_domain_accuracy": 0.21155427396297455,
+        "worst_domain_macro_f1": 0.09874109756977607
+      },
+      "train": {
+        "examples": 48964,
+        "loss": 1.2382657826019847,
+        "steps": 192
+      }
+    }
+  ],
+  "num_test": 68332,
+  "num_train": 48964,
+  "run_name": "amplitude_only",
+  "test_cache": "/home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_test_cache.pkl",
+  "train_cache": "/home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_train_cache.pkl"
+}
