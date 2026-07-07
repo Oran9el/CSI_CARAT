@@ -22,6 +22,18 @@ clean:
   hampel_n_sigmas: 3.0
   instance_normalize: true
 
+features:
+  feature_cache_root: /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache
+  train_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_train_cache.pkl
+  test_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_test_cache.pkl
+  branches:
+    - amplitude
+    - phase_difference
+    - doppler_spectrogram
+  n_fft: 32
+  hop_length: 16
+  window: hann
+
 model:
   input_subcarriers: 30
   window_size: 220

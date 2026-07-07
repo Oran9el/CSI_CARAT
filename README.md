@@ -53,3 +53,20 @@ Expected clean cache outputs:
 /home/ccl/data/csi-carat/widar3/widar3g6d/clean_cache/widar3-g6_clean_train_cache.pkl
 /home/ccl/data/csi-carat/widar3/widar3g6d/clean_cache/widar3-g6_clean_test_cache.pkl
 ```
+
+Extract model-ready Widar3.0-G6D feature caches:
+
+```bash
+python scripts/extract_widar3_features.py \
+  --data-root /home/ccl/data/csi-carat \
+  --split BOTH \
+  --n-fft 32 \
+  --hop-length 16
+```
+
+Expected feature cache outputs:
+
+```text
+/home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_train_cache.pkl
+/home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_test_cache.pkl
+```
