@@ -10,6 +10,8 @@ def test_widar_config_exists_and_points_to_server_root():
     assert "widar3g6d" in text
     assert "feature_output_dir: results/widar3_features" in text
     assert "max_steps: 20" in text
+    assert "output_dir: results/widar3_erm" in text
+    assert "epochs: 10" in text
 
 
 def test_scripts_are_importable():
@@ -19,6 +21,7 @@ def test_scripts_are_importable():
     import scripts.preprocess_widar3_g6d as preprocess_script
     import scripts.report_widar3_features as report_script
     import scripts.train as train_script
+    import scripts.train_widar3_erm_baseline as erm_baseline_script
     import scripts.train_widar3_erm as erm_script
 
     assert callable(clean_script.main)
@@ -28,3 +31,4 @@ def test_scripts_are_importable():
     assert callable(preprocess_script.main)
     assert callable(report_script.main)
     assert callable(erm_script.main)
+    assert callable(erm_baseline_script.main)

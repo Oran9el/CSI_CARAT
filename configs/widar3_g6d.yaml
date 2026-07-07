@@ -58,6 +58,18 @@ erm:
   max_steps: 20
   learning_rate: 0.001
 
+erm_baseline:
+  train_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_train_cache.pkl
+  test_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_test_cache.pkl
+  output_dir: results/widar3_erm
+  run_name: amplitude_only
+  batch_size: 256
+  epochs: 10
+  max_steps_per_epoch: 0
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  seed: 3407
+
 tta:
   batch_size: 1
   learning_rate: 0.00001

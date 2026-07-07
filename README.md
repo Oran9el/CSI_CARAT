@@ -98,3 +98,23 @@ CUDA_VISIBLE_DEVICES=7 python scripts/train_widar3_erm.py \
 ```
 
 The sanity report checks feature shapes, finite values, label counts, and domain/user/environment counts. The ERM smoke is not the final CSI-CARAT baseline; it validates the feature cache, PyTorch Dataset, DataLoader, model forward pass, loss, and optimizer path before adding multi-branch fusion and CARAT/TTA objectives.
+
+Run the reproducible amplitude-only source ERM baseline:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_erm_baseline.py \
+  --data-root /home/ccl/data/csi-carat \
+  --batch-size 256 \
+  --epochs 10 \
+  --device cuda \
+  --output-dir results/widar3_erm
+```
+
+Expected baseline outputs:
+
+```text
+results/widar3_erm/amplitude_only_metrics.json
+results/widar3_erm/amplitude_only_metrics.md
+```
+
+The checkpoint is written to `results/widar3_erm/amplitude_only_checkpoint.pt` and is ignored by Git.

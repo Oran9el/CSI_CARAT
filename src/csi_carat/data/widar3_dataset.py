@@ -20,11 +20,13 @@ class WidarFeatureDataset(Dataset):
         self,
         cache_path: str | Path,
         branches: Sequence[str] = DEFAULT_BRANCHES,
+        domain_map: dict[int, int] | None = None,
     ) -> None:
         self.cache_path = Path(cache_path).expanduser()
         with self.cache_path.open("rb") as handle:
             self.cache = pickle.load(handle)
         self.branches = tuple(branches)
+        self.domain_map = domain_map
         missing = [branch for branch in self.branches if branch not in self.cache]
         if missing:
             raise KeyError(f"Missing feature branches in cache: {missing}")
@@ -40,7 +42,10 @@ class WidarFeatureDataset(Dataset):
         activity_raw = int(self.cache["activities"][index])
         item["activity"] = torch.tensor(activity_raw - 1, dtype=torch.long)
         item["activity_raw"] = torch.tensor(activity_raw, dtype=torch.long)
-        item["domain"] = torch.tensor(int(self.cache["domains"][index]), dtype=torch.long)
+        domain_raw = int(self.cache["domains"][index])
+        domain = self.domain_map[domain_raw] if self.domain_map is not None else domain_raw
+        item["domain"] = torch.tensor(domain, dtype=torch.long)
+        item["domain_raw"] = torch.tensor(domain_raw, dtype=torch.long)
         item["environment"] = torch.tensor(int(self.cache["environments"][index]), dtype=torch.long)
         item["user"] = torch.tensor(int(self.cache["users"][index]), dtype=torch.long)
         item["source_index"] = torch.tensor(int(self.cache["source_indices"][index]), dtype=torch.long)
