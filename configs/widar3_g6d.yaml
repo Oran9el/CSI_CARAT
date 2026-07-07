@@ -34,9 +34,12 @@ features:
   hop_length: 16
   window: hann
 
+reports:
+  feature_output_dir: results/widar3_features
+
 model:
   input_subcarriers: 30
-  window_size: 220
+  window_size: 128
   feature_dim: 64
   factor_dim: 32
   num_classes: 6
@@ -48,6 +51,12 @@ train:
   epochs: 100
   learning_rate: 0.0001
   seed: 3407
+
+erm:
+  train_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_train_cache.pkl
+  batch_size: 64
+  max_steps: 20
+  learning_rate: 0.001
 
 tta:
   batch_size: 1

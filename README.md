@@ -70,3 +70,31 @@ Expected feature cache outputs:
 /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_train_cache.pkl
 /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_test_cache.pkl
 ```
+
+Generate feature-cache sanity reports before training:
+
+```bash
+python scripts/report_widar3_features.py \
+  --data-root /home/ccl/data/csi-carat \
+  --split BOTH \
+  --output-dir results/widar3_features
+```
+
+Expected report outputs:
+
+```text
+results/widar3_features/train_feature_report.md
+results/widar3_features/test_feature_report.md
+```
+
+Run the first amplitude-only ERM smoke baseline:
+
+```bash
+CUDA_VISIBLE_DEVICES=7 python scripts/train_widar3_erm.py \
+  --data-root /home/ccl/data/csi-carat \
+  --batch-size 64 \
+  --max-steps 20 \
+  --device cuda
+```
+
+The sanity report checks feature shapes, finite values, label counts, and domain/user/environment counts. The ERM smoke is not the final CSI-CARAT baseline; it validates the feature cache, PyTorch Dataset, DataLoader, model forward pass, loss, and optimizer path before adding multi-branch fusion and CARAT/TTA objectives.
