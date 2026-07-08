@@ -200,3 +200,25 @@ results/widar3_erm/risk_multibranch_metrics.md
 ```
 
 This baseline is the smallest measurable version of CSI-CARAT's risk-aware objective: average CE plus smooth worst-source-domain risk.
+
+Run a compact risk sweep:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/sweep_widar3_risk_multibranch.py \
+  --data-root /home/ccl/data/csi-carat \
+  --risk-weights 0.25,0.5,1.0 \
+  --risk-etas 2.0 \
+  --batch-size 256 \
+  --epochs 10 \
+  --device cuda \
+  --output-dir results/widar3_erm
+```
+
+Expected sweep summary outputs:
+
+```text
+results/widar3_erm/risk_sweep_summary.json
+results/widar3_erm/risk_sweep_summary.md
+```
+
+Each sweep setting also writes its own `risk_multibranch_w*_eta*_metrics.json` and `.md` files for detailed inspection.

@@ -267,3 +267,45 @@ def test_overfit_diagnostic_uses_model_specific_output_names(tmp_path):
 
     assert json_path.name == "overfit_subset_multibranch_metrics.json"
     assert report_path.name == "overfit_subset_multibranch_metrics.md"
+
+
+def test_risk_sweep_parses_float_lists_and_names_runs():
+    from scripts.sweep_widar3_risk_multibranch import parse_float_list, risk_run_name
+
+    assert parse_float_list("0.25, 0.5,1") == (0.25, 0.5, 1.0)
+    assert risk_run_name(0.25, 2.0) == "risk_multibranch_w0p25_eta2p0"
+
+
+def test_risk_sweep_summary_extracts_key_metrics():
+    from scripts.sweep_widar3_risk_multibranch import summarize_completed_runs
+
+    metrics = {
+        "best": {
+            "macro_f1": {
+                "epoch": 3,
+                "test": {
+                    "accuracy": 0.4,
+                    "macro_f1": 0.5,
+                    "worst_domain_macro_f1": 0.2,
+                    "per_domain": {"8": {"accuracy": 0.1, "macro_f1": 0.08, "support": 12}},
+                },
+            },
+            "worst_domain_macro_f1": {
+                "epoch": 1,
+                "test": {
+                    "accuracy": 0.3,
+                    "macro_f1": 0.35,
+                    "worst_domain_macro_f1": 0.25,
+                    "per_domain": {"8": {"accuracy": 0.2, "macro_f1": 0.18, "support": 12}},
+                },
+            },
+        },
+        "final": {"train_eval": {"macro_f1": 0.6, "worst_domain_macro_f1": 0.4}},
+    }
+
+    summary = summarize_completed_runs([{"run_name": "risk", "risk_weight": 0.25, "risk_eta": 2.0, "metrics": metrics}])
+
+    assert summary[0]["run_name"] == "risk"
+    assert summary[0]["best_macro_f1"] == 0.5
+    assert summary[0]["best_worst_domain_macro_f1"] == 0.25
+    assert summary[0]["domain8_macro_f1_at_best_macro"] == 0.08

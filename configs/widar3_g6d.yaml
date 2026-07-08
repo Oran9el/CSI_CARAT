@@ -102,6 +102,16 @@ risk_multibranch_erm:
   risk_eta: 2.0
   seed: 3407
 
+risk_sweep:
+  output_dir: results/widar3_erm
+  risk_weights: 0.25,0.5,1.0
+  risk_etas: 2.0
+  batch_size: 256
+  epochs: 10
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  seed: 3407
+
 tta:
   batch_size: 1
   learning_rate: 0.00001
