@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from csi_carat.engine.erm import evaluate_erm, run_erm_epoch, train_one_erm_step
-from csi_carat.models.baselines import AmplitudeCnnClassifier
+from csi_carat.models.baselines import AmplitudeCnnClassifier, MultiBranchCnnClassifier
 from scripts.train_widar3_erm_baseline import _write_markdown, select_best_epoch, summarize_best_epochs
 
 
@@ -11,6 +11,23 @@ def test_amplitude_cnn_classifier_forward_shape():
     x = torch.randn(4, 30, 128)
 
     logits = model(x)
+
+    assert logits.shape == (4, 6)
+
+
+def test_multibranch_cnn_classifier_forward_shape():
+    model = MultiBranchCnnClassifier(
+        num_subcarriers=30,
+        window_size=128,
+        doppler_bins=17,
+        doppler_frames=7,
+        num_classes=6,
+    )
+    logits = model(
+        amplitude=torch.randn(4, 30, 128),
+        phase_difference=torch.randn(4, 30, 128),
+        doppler_spectrogram=torch.randn(4, 30, 17, 7),
+    )
 
     assert logits.shape == (4, 6)
 
@@ -28,6 +45,32 @@ def test_train_one_erm_step_returns_finite_loss_and_updates_parameters():
 
     assert torch.isfinite(loss)
     assert not torch.allclose(before, model.classifier.weight.detach())
+
+
+def test_train_one_erm_step_accepts_multibranch_feature_keys():
+    model = MultiBranchCnnClassifier(
+        num_subcarriers=3,
+        window_size=16,
+        doppler_bins=5,
+        doppler_frames=2,
+        num_classes=6,
+    )
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    batch = {
+        "amplitude": torch.randn(4, 3, 16),
+        "phase_difference": torch.randn(4, 3, 16),
+        "doppler_spectrogram": torch.randn(4, 3, 5, 2),
+        "activity": torch.tensor([0, 1, 2, 3], dtype=torch.long),
+    }
+
+    loss = train_one_erm_step(
+        model,
+        batch,
+        optimizer,
+        feature_keys=("amplitude", "phase_difference", "doppler_spectrogram"),
+    )
+
+    assert torch.isfinite(loss)
 
 
 def _make_dict_loader(batch_size: int = 2) -> DataLoader:

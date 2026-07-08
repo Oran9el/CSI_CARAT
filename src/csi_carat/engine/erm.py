@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -14,14 +16,14 @@ def train_one_erm_step(
     batch: dict[str, torch.Tensor],
     optimizer: torch.optim.Optimizer,
     device: torch.device | str = "cpu",
+    feature_keys: Sequence[str] = ("amplitude",),
 ) -> torch.Tensor:
-    """Run one amplitude-only ERM optimization step."""
+    """Run one ERM optimization step."""
 
     model.train()
-    amplitude = batch["amplitude"].to(device)
     target = batch["activity"].to(device)
     optimizer.zero_grad(set_to_none=True)
-    logits = model(amplitude)
+    logits = _forward_with_features(model, batch, device=device, feature_keys=feature_keys)
     loss = F.cross_entropy(logits, target)
     loss.backward()
     optimizer.step()
@@ -34,6 +36,7 @@ def run_erm_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device | str = "cpu",
     max_steps: int = 0,
+    feature_keys: Sequence[str] = ("amplitude",),
 ) -> dict[str, float | int]:
     """Run one supervised ERM epoch and return weighted training metrics."""
 
@@ -43,7 +46,7 @@ def run_erm_epoch(
 
     for batch in dataloader:
         batch_size = int(batch["activity"].shape[0])
-        loss = train_one_erm_step(model, batch, optimizer, device=device)
+        loss = train_one_erm_step(model, batch, optimizer, device=device, feature_keys=feature_keys)
         total_loss += float(loss) * batch_size
         total_examples += batch_size
         steps += 1
@@ -65,8 +68,9 @@ def evaluate_erm(
     device: torch.device | str = "cpu",
     num_classes: int = 6,
     include_breakdown: bool = False,
+    feature_keys: Sequence[str] = ("amplitude",),
 ) -> dict[str, object]:
-    """Evaluate an amplitude-only ERM classifier."""
+    """Evaluate an ERM classifier."""
 
     model.eval()
     total_loss = 0.0
@@ -77,9 +81,8 @@ def evaluate_erm(
 
     with torch.no_grad():
         for batch in dataloader:
-            amplitude = batch["amplitude"].to(device)
             target = batch["activity"].to(device)
-            logits = model(amplitude)
+            logits = _forward_with_features(model, batch, device=device, feature_keys=feature_keys)
             loss = F.cross_entropy(logits, target)
             batch_size = int(target.shape[0])
             total_loss += float(loss.detach().cpu()) * batch_size
@@ -98,3 +101,15 @@ def evaluate_erm(
     if include_breakdown:
         summary.update(classification_breakdown(y_true, y_pred, domain_ids, num_classes=num_classes))
     return {"loss": total_loss / total_examples, **summary}
+
+
+def _forward_with_features(
+    model: nn.Module,
+    batch: dict[str, torch.Tensor],
+    device: torch.device | str,
+    feature_keys: Sequence[str],
+) -> torch.Tensor:
+    if len(feature_keys) == 1:
+        return model(batch[feature_keys[0]].to(device))
+    inputs = {key: batch[key].to(device) for key in feature_keys}
+    return model(**inputs)

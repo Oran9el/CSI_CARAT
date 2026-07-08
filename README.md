@@ -138,3 +138,23 @@ results/widar3_erm/overfit_subset_metrics.md
 ```
 
 If the tiny subset cannot approach the target accuracy, debug labels/features/model capacity before building CSI-CARAT. If it overfits but target-domain ERM stays low, the failure is cross-domain generalization, which is exactly the setting CSI-CARAT is meant to address.
+
+Run the three-branch ERM baseline before CSI-CARAT:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_multibranch_erm.py \
+  --data-root /home/ccl/data/csi-carat \
+  --batch-size 256 \
+  --epochs 10 \
+  --device cuda \
+  --output-dir results/widar3_erm
+```
+
+Expected multibranch outputs:
+
+```text
+results/widar3_erm/multibranch_metrics.json
+results/widar3_erm/multibranch_metrics.md
+```
+
+This baseline uses amplitude, phase-difference, and Doppler/spectrogram branches. It is the next source-learnability gate before adding CSI-CARAT losses, gates, and test-time calibration.
