@@ -190,3 +190,23 @@ def test_build_balanced_subset_indices_selects_same_count_per_class():
     indices = build_balanced_subset_indices(labels, samples_per_class=2, num_classes=3)
 
     assert indices == [0, 1, 3, 4, 5, 6]
+
+
+def test_overfit_diagnostic_selects_feature_keys_by_model_name():
+    from scripts.overfit_widar3_erm_subset import model_feature_keys
+
+    assert model_feature_keys("amplitude") == ("amplitude",)
+    assert model_feature_keys("multibranch") == (
+        "amplitude",
+        "phase_difference",
+        "doppler_spectrogram",
+    )
+
+
+def test_overfit_diagnostic_uses_model_specific_output_names(tmp_path):
+    from scripts.overfit_widar3_erm_subset import overfit_output_paths
+
+    json_path, report_path = overfit_output_paths(tmp_path, "multibranch")
+
+    assert json_path.name == "overfit_subset_multibranch_metrics.json"
+    assert report_path.name == "overfit_subset_multibranch_metrics.md"

@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, Subset
 from csi_carat.data.paths import WidarG6DPaths
 from csi_carat.data.widar3_dataset import WidarFeatureDataset
 from csi_carat.engine.erm import evaluate_erm, run_erm_epoch
-from csi_carat.models.baselines import AmplitudeCnnClassifier
+from csi_carat.models.baselines import AmplitudeCnnClassifier, MultiBranchCnnClassifier
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--fail-on-threshold", action="store_true")
+    parser.add_argument("--model", choices=["amplitude", "multibranch"], default="amplitude")
     return parser
 
 
@@ -43,19 +44,16 @@ def main(argv: list[str] | None = None) -> int:
     feature_root = paths.cache_root.parent / "feature_cache"
     train_cache = Path(args.train_cache).expanduser() if args.train_cache else feature_root / "widar3-g6_features_train_cache.pkl"
 
-    dataset = WidarFeatureDataset(train_cache, branches=("amplitude",))
+    feature_keys = model_feature_keys(args.model)
+    dataset = WidarFeatureDataset(train_cache, branches=feature_keys)
     labels = torch.as_tensor(dataset.cache["activities"], dtype=torch.long) - 1
     indices = build_balanced_subset_indices(labels, args.samples_per_class, num_classes=6)
     subset = Subset(dataset, indices)
-    first = dataset[indices[0]]["amplitude"]
+    first = dataset[indices[0]]
 
     train_loader = DataLoader(subset, batch_size=args.batch_size, shuffle=True)
     eval_loader = DataLoader(subset, batch_size=args.batch_size, shuffle=False)
-    model = AmplitudeCnnClassifier(
-        num_subcarriers=int(first.shape[0]),
-        window_size=int(first.shape[1]),
-        num_classes=6,
-    ).to(args.device)
+    model = build_overfit_model(args.model, first).to(args.device)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=args.learning_rate,
@@ -64,13 +62,20 @@ def main(argv: list[str] | None = None) -> int:
 
     history = []
     for epoch in range(1, args.epochs + 1):
-        train_metrics = run_erm_epoch(model, train_loader, optimizer, device=args.device)
+        train_metrics = run_erm_epoch(
+            model,
+            train_loader,
+            optimizer,
+            device=args.device,
+            feature_keys=feature_keys,
+        )
         eval_metrics = evaluate_erm(
             model,
             eval_loader,
             device=args.device,
             num_classes=6,
             include_breakdown=True,
+            feature_keys=feature_keys,
         )
         history.append({"epoch": epoch, "train": train_metrics, "eval": eval_metrics})
         print(
@@ -86,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
     passed = float(best["eval"]["accuracy"]) >= args.target_accuracy
     payload = {
         "train_cache": str(train_cache),
+        "model": args.model,
+        "feature_keys": feature_keys,
         "samples_per_class": args.samples_per_class,
         "num_examples": len(indices),
         "target_accuracy": args.target_accuracy,
@@ -98,8 +105,7 @@ def main(argv: list[str] | None = None) -> int:
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "overfit_subset_metrics.json"
-    report_path = output_dir / "overfit_subset_metrics.md"
+    json_path, report_path = overfit_output_paths(output_dir, args.model)
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     _write_markdown(report_path, payload)
     print(f"wrote metrics to {json_path}")
@@ -108,6 +114,44 @@ def main(argv: list[str] | None = None) -> int:
     if args.fail_on_threshold and not passed:
         return 2
     return 0
+
+
+def model_feature_keys(model_name: str) -> tuple[str, ...]:
+    if model_name == "amplitude":
+        return ("amplitude",)
+    if model_name == "multibranch":
+        return ("amplitude", "phase_difference", "doppler_spectrogram")
+    raise ValueError(f"Unsupported overfit model: {model_name}")
+
+
+def overfit_output_paths(output_dir: str | Path, model_name: str) -> tuple[Path, Path]:
+    output_path = Path(output_dir)
+    if model_name == "amplitude":
+        stem = "overfit_subset_metrics"
+    else:
+        stem = f"overfit_subset_{model_name}_metrics"
+    return output_path / f"{stem}.json", output_path / f"{stem}.md"
+
+
+def build_overfit_model(model_name: str, first_sample: dict[str, torch.Tensor]) -> torch.nn.Module:
+    if model_name == "amplitude":
+        amplitude = first_sample["amplitude"]
+        return AmplitudeCnnClassifier(
+            num_subcarriers=int(amplitude.shape[0]),
+            window_size=int(amplitude.shape[1]),
+            num_classes=6,
+        )
+    if model_name == "multibranch":
+        amplitude = first_sample["amplitude"]
+        doppler = first_sample["doppler_spectrogram"]
+        return MultiBranchCnnClassifier(
+            num_subcarriers=int(amplitude.shape[0]),
+            window_size=int(amplitude.shape[1]),
+            doppler_bins=int(doppler.shape[1]),
+            doppler_frames=int(doppler.shape[2]),
+            num_classes=6,
+        )
+    raise ValueError(f"Unsupported overfit model: {model_name}")
 
 
 def build_balanced_subset_indices(
@@ -136,6 +180,7 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
         "# Widar3 Tiny-Subset Overfit Diagnostic",
         "",
         f"train_cache: {payload['train_cache']}",
+        f"model: {payload['model']}",
         f"samples_per_class: {payload['samples_per_class']}",
         f"num_examples: {payload['num_examples']}",
         f"target_accuracy: {payload['target_accuracy']}",

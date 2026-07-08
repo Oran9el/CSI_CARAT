@@ -124,6 +124,7 @@ Run a tiny-subset overfit diagnostic if target-domain ERM looks suspiciously low
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/overfit_widar3_erm_subset.py \
   --data-root /home/ccl/data/csi-carat \
+  --model amplitude \
   --samples-per-class 16 \
   --epochs 100 \
   --device cuda \
@@ -135,6 +136,25 @@ Expected diagnostic outputs:
 ```text
 results/widar3_erm/overfit_subset_metrics.json
 results/widar3_erm/overfit_subset_metrics.md
+```
+
+Run the same diagnostic for the three-branch model:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/overfit_widar3_erm_subset.py \
+  --data-root /home/ccl/data/csi-carat \
+  --model multibranch \
+  --samples-per-class 16 \
+  --epochs 100 \
+  --device cuda \
+  --output-dir results/widar3_erm
+```
+
+Expected multibranch diagnostic outputs:
+
+```text
+results/widar3_erm/overfit_subset_multibranch_metrics.json
+results/widar3_erm/overfit_subset_multibranch_metrics.md
 ```
 
 If the tiny subset cannot approach the target accuracy, debug labels/features/model capacity before building CSI-CARAT. If it overfits but target-domain ERM stays low, the failure is cross-domain generalization, which is exactly the setting CSI-CARAT is meant to address.
