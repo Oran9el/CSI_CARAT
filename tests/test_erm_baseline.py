@@ -8,7 +8,11 @@ from csi_carat.engine.erm import (
     train_one_erm_step,
     train_one_risk_aware_step,
 )
-from csi_carat.models.baselines import AmplitudeCnnClassifier, MultiBranchCnnClassifier
+from csi_carat.models.baselines import (
+    AmplitudeCnnClassifier,
+    MultiBranchCnnClassifier,
+    MultiBranchTransformerClassifier,
+)
 from scripts.train_widar3_erm_baseline import _write_markdown, select_best_epoch, summarize_best_epochs
 
 
@@ -28,6 +32,26 @@ def test_multibranch_cnn_classifier_forward_shape():
         doppler_bins=17,
         doppler_frames=7,
         num_classes=6,
+    )
+    logits = model(
+        amplitude=torch.randn(4, 30, 128),
+        phase_difference=torch.randn(4, 30, 128),
+        doppler_spectrogram=torch.randn(4, 30, 17, 7),
+    )
+
+    assert logits.shape == (4, 6)
+
+
+def test_multibranch_transformer_classifier_forward_shape():
+    model = MultiBranchTransformerClassifier(
+        num_subcarriers=30,
+        window_size=128,
+        doppler_bins=17,
+        doppler_frames=7,
+        num_classes=6,
+        feature_dim=32,
+        num_heads=4,
+        num_layers=1,
     )
     logits = model(
         amplitude=torch.randn(4, 30, 128),

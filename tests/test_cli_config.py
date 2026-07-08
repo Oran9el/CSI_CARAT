@@ -14,6 +14,7 @@ def test_widar_config_exists_and_points_to_server_root():
     assert "epochs: 10" in text
     assert "run_name: multibranch" in text
     assert "run_name: risk_multibranch" in text
+    assert "run_name: transformer_multibranch" in text
     assert "risk_weights: 0.25,0.5,1.0" in text
 
 
@@ -29,6 +30,7 @@ def test_scripts_are_importable():
     import scripts.train_widar3_erm as erm_script
     import scripts.train_widar3_multibranch_erm as multibranch_script
     import scripts.train_widar3_risk_multibranch as risk_multibranch_script
+    import scripts.train_widar3_transformer_multibranch as transformer_script
     import scripts.sweep_widar3_risk_multibranch as risk_sweep_script
 
     assert callable(clean_script.main)
@@ -43,3 +45,4 @@ def test_scripts_are_importable():
     assert callable(multibranch_script.main)
     assert callable(risk_multibranch_script.main)
     assert callable(risk_sweep_script.main)
+    assert callable(transformer_script.main)

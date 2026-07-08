@@ -222,3 +222,27 @@ results/widar3_erm/risk_sweep_summary.md
 ```
 
 Each sweep setting also writes its own `risk_multibranch_w*_eta*_metrics.json` and `.md` files for detailed inspection.
+
+Run the three-branch Transformer ERM baseline:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_transformer_multibranch.py \
+  --data-root /home/ccl/data/csi-carat \
+  --batch-size 128 \
+  --epochs 10 \
+  --learning-rate 0.0003 \
+  --feature-dim 96 \
+  --num-heads 4 \
+  --num-layers 2 \
+  --device cuda \
+  --output-dir results/widar3_erm
+```
+
+Expected Transformer outputs:
+
+```text
+results/widar3_erm/transformer_multibranch_metrics.json
+results/widar3_erm/transformer_multibranch_metrics.md
+```
+
+This baseline tests whether stronger temporal encoding lifts source learnability before adding CSI-CARAT factor disentanglement, gates, or TTA.
