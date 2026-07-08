@@ -71,6 +71,28 @@ Expected feature cache outputs:
 /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_test_cache.pkl
 ```
 
+Extract Wi-CBR reproduction feature caches directly from raw `.dat` files:
+
+```bash
+python -m pip install -e ".[preprocess,wicbr]"
+python scripts/extract_widar3_wicbr_features.py \
+  --data-root /home/ccl/data/csi-carat \
+  --split BOTH \
+  --image-size 224 \
+  --packet-downsample 1 \
+  --n-fft 128 \
+  --hop-length 32
+```
+
+Expected Wi-CBR cache outputs:
+
+```text
+/home/ccl/data/csi-carat/widar3/widar3g6d/wicbr_cache/widar3-g6_wicbr_train_cache.pkl
+/home/ccl/data/csi-carat/widar3/widar3g6d/wicbr_cache/widar3-g6_wicbr_test_cache.pkl
+```
+
+This path keeps all three receive antennas and groups the six receiver `.dat` files for each Widar trial before computing CSI-ratio phase images and Doppler velocity spectrum images.
+
 Generate feature-cache sanity reports before training:
 
 ```bash
@@ -272,3 +294,27 @@ results/widar3_erm/risk_transformer_multibranch_metrics.md
 ```
 
 This run combines the strongest temporal encoder tested so far with the smooth worst-source-domain risk objective. Use it to decide whether CSI-CARAT should prioritize the risk path, the Transformer backbone, or both before adding causal factor heads and TTA.
+
+Run the Wi-CBR reproduction baseline:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr.py \
+  --data-root /home/ccl/data/csi-carat \
+  --batch-size 10 \
+  --epochs 30 \
+  --learning-rate 0.0001 \
+  --contrastive-weight 0.1 \
+  --temperature 0.1 \
+  --backbone resnet18 \
+  --device cuda \
+  --output-dir results/widar3_wicbr
+```
+
+Expected Wi-CBR outputs:
+
+```text
+results/widar3_wicbr/wicbr_metrics.json
+results/widar3_wicbr/wicbr_metrics.md
+```
+
+For a dependency-light smoke test, replace `--backbone resnet18` with `--backbone small --max-steps-per-epoch 20 --no-checkpoint`. The ResNet18 path is closer to the Wi-CBR code release; the small path only validates the CSI-CARAT training plumbing.

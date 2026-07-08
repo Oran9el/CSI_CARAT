@@ -16,6 +16,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 preprocess = ["csiread>=1.4"]
+wicbr = ["torchvision>=0.15"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

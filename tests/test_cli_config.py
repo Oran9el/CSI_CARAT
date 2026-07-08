@@ -17,12 +17,15 @@ def test_widar_config_exists_and_points_to_server_root():
     assert "run_name: transformer_multibranch" in text
     assert "run_name: risk_transformer_multibranch" in text
     assert "risk_weights: 0.25,0.5,1.0" in text
+    assert "wicbr_cache_root" in text
+    assert "run_name: wicbr" in text
 
 
 def test_scripts_are_importable():
     import scripts.clean_widar3_g6d as clean_script
     import scripts.evaluate as evaluate_script
     import scripts.extract_widar3_features as feature_script
+    import scripts.extract_widar3_wicbr_features as wicbr_feature_script
     import scripts.overfit_widar3_erm_subset as overfit_script
     import scripts.preprocess_widar3_g6d as preprocess_script
     import scripts.report_widar3_features as report_script
@@ -33,12 +36,14 @@ def test_scripts_are_importable():
     import scripts.train_widar3_risk_multibranch as risk_multibranch_script
     import scripts.train_widar3_risk_transformer_multibranch as risk_transformer_script
     import scripts.train_widar3_transformer_multibranch as transformer_script
+    import scripts.train_widar3_wicbr as wicbr_script
     import scripts.sweep_widar3_risk_multibranch as risk_sweep_script
 
     assert callable(clean_script.main)
     assert callable(train_script.main)
     assert callable(evaluate_script.main)
     assert callable(feature_script.main)
+    assert callable(wicbr_feature_script.main)
     assert callable(preprocess_script.main)
     assert callable(report_script.main)
     assert callable(erm_script.main)
@@ -49,3 +54,4 @@ def test_scripts_are_importable():
     assert callable(risk_transformer_script.main)
     assert callable(risk_sweep_script.main)
     assert callable(transformer_script.main)
+    assert callable(wicbr_script.main)
