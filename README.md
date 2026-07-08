@@ -178,3 +178,25 @@ results/widar3_erm/multibranch_metrics.md
 ```
 
 This baseline uses amplitude, phase-difference, and Doppler/spectrogram branches. It is the next source-learnability gate before adding CSI-CARAT losses, gates, and test-time calibration.
+
+Run the risk-aware three-branch baseline:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_risk_multibranch.py \
+  --data-root /home/ccl/data/csi-carat \
+  --batch-size 256 \
+  --epochs 10 \
+  --risk-weight 0.5 \
+  --risk-eta 2.0 \
+  --device cuda \
+  --output-dir results/widar3_erm
+```
+
+Expected risk-aware outputs:
+
+```text
+results/widar3_erm/risk_multibranch_metrics.json
+results/widar3_erm/risk_multibranch_metrics.md
+```
+
+This baseline is the smallest measurable version of CSI-CARAT's risk-aware objective: average CE plus smooth worst-source-domain risk.

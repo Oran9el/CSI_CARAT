@@ -1,7 +1,13 @@
 import torch
 from torch.utils.data import DataLoader
 
-from csi_carat.engine.erm import evaluate_erm, run_erm_epoch, train_one_erm_step
+from csi_carat.engine.erm import (
+    domain_ce_losses,
+    evaluate_erm,
+    run_erm_epoch,
+    train_one_erm_step,
+    train_one_risk_aware_step,
+)
 from csi_carat.models.baselines import AmplitudeCnnClassifier, MultiBranchCnnClassifier
 from scripts.train_widar3_erm_baseline import _write_markdown, select_best_epoch, summarize_best_epochs
 
@@ -71,6 +77,57 @@ def test_train_one_erm_step_accepts_multibranch_feature_keys():
     )
 
     assert torch.isfinite(loss)
+
+
+def test_domain_ce_losses_returns_one_loss_per_present_domain():
+    logits = torch.tensor(
+        [
+            [3.0, 0.1],
+            [0.2, 2.0],
+            [0.5, 1.0],
+            [1.5, 0.1],
+        ],
+        dtype=torch.float32,
+    )
+    target = torch.tensor([0, 1, 1, 0], dtype=torch.long)
+    domains = torch.tensor([9, 9, 10, 10], dtype=torch.long)
+
+    losses = domain_ce_losses(logits, target, domains)
+
+    assert losses.shape == (2,)
+    assert torch.isfinite(losses).all()
+
+
+def test_train_one_risk_aware_step_returns_loss_parts_and_updates_parameters():
+    model = MultiBranchCnnClassifier(
+        num_subcarriers=3,
+        window_size=16,
+        doppler_bins=5,
+        doppler_frames=2,
+        num_classes=6,
+    )
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    batch = {
+        "amplitude": torch.randn(4, 3, 16),
+        "phase_difference": torch.randn(4, 3, 16),
+        "doppler_spectrogram": torch.randn(4, 3, 5, 2),
+        "activity": torch.tensor([0, 1, 2, 3], dtype=torch.long),
+        "domain": torch.tensor([9, 9, 10, 10], dtype=torch.long),
+    }
+    before = model.classifier[-1].weight.detach().clone()
+
+    metrics = train_one_risk_aware_step(
+        model,
+        batch,
+        optimizer,
+        feature_keys=("amplitude", "phase_difference", "doppler_spectrogram"),
+        risk_weight=0.5,
+        risk_eta=2.0,
+    )
+
+    assert set(metrics) == {"loss", "ce_loss", "risk_loss"}
+    assert torch.isfinite(metrics["loss"])
+    assert not torch.allclose(before, model.classifier[-1].weight.detach())
 
 
 def _make_dict_loader(batch_size: int = 2) -> DataLoader:
