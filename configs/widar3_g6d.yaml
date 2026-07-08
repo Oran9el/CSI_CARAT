@@ -127,6 +127,23 @@ transformer_multibranch:
   dropout: 0.1
   seed: 3407
 
+risk_transformer_multibranch:
+  train_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_train_cache.pkl
+  test_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/feature_cache/widar3-g6_features_test_cache.pkl
+  output_dir: results/widar3_erm
+  run_name: risk_transformer_multibranch
+  batch_size: 128
+  epochs: 10
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  feature_dim: 96
+  num_heads: 4
+  num_layers: 2
+  dropout: 0.1
+  risk_weight: 0.25
+  risk_eta: 2.0
+  seed: 3407
+
 tta:
   batch_size: 1
   learning_rate: 0.00001

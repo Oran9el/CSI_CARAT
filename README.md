@@ -246,3 +246,29 @@ results/widar3_erm/transformer_multibranch_metrics.md
 ```
 
 This baseline tests whether stronger temporal encoding lifts source learnability before adding CSI-CARAT factor disentanglement, gates, or TTA.
+
+Run the risk-aware three-branch Transformer baseline:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_risk_transformer_multibranch.py \
+  --data-root /home/ccl/data/csi-carat \
+  --batch-size 128 \
+  --epochs 10 \
+  --learning-rate 0.0003 \
+  --feature-dim 96 \
+  --num-heads 4 \
+  --num-layers 2 \
+  --risk-weight 0.25 \
+  --risk-eta 2.0 \
+  --device cuda \
+  --output-dir results/widar3_erm
+```
+
+Expected risk-aware Transformer outputs:
+
+```text
+results/widar3_erm/risk_transformer_multibranch_metrics.json
+results/widar3_erm/risk_transformer_multibranch_metrics.md
+```
+
+This run combines the strongest temporal encoder tested so far with the smooth worst-source-domain risk objective. Use it to decide whether CSI-CARAT should prioritize the risk path, the Transformer backbone, or both before adding causal factor heads and TTA.
