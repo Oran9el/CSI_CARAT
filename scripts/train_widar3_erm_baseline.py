@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--num-workers", type=int, default=2)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--no-checkpoint", action="store_true")
+    parser.add_argument("--skip-train-eval", action="store_true")
     return parser
 
 
@@ -95,21 +96,38 @@ def main(argv: list[str] | None = None) -> int:
             num_classes=6,
             include_breakdown=True,
         )
+        train_eval_metrics = None
+        if not args.skip_train_eval:
+            train_eval_metrics = evaluate_erm(
+                model,
+                train_loader,
+                device=args.device,
+                num_classes=6,
+                include_breakdown=True,
+            )
         record = {"epoch": epoch, "train": train_metrics, "test": test_metrics}
+        if train_eval_metrics is not None:
+            record["train_eval"] = train_eval_metrics
         history.append(record)
         if float(test_metrics["macro_f1"]) > best_macro_f1:
             best_macro_f1 = float(test_metrics["macro_f1"])
             best_state_dict = copy.deepcopy(
                 {key: value.detach().cpu() for key, value in model.state_dict().items()}
             )
+        source_acc = (
+            f" source_acc={train_eval_metrics['accuracy']:.4f}"
+            if train_eval_metrics is not None
+            else ""
+        )
         print(
             "epoch={epoch} train_loss={train_loss:.6f} test_acc={test_acc:.4f} "
-            "test_macro_f1={test_f1:.4f} worst_domain_acc={worst_acc:.4f}".format(
+            "test_macro_f1={test_f1:.4f} worst_domain_acc={worst_acc:.4f}{source_acc}".format(
                 epoch=epoch,
                 train_loss=train_metrics["loss"],
                 test_acc=test_metrics["accuracy"],
                 test_f1=test_metrics["macro_f1"],
                 worst_acc=test_metrics["worst_domain_accuracy"],
+                source_acc=source_acc,
             )
         )
 
@@ -183,6 +201,7 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
     final = payload["final"]
     train = final["train"]
     test = final["test"]
+    train_eval = final.get("train_eval")
     best = payload["best"]
     lines = [
         "# Widar3 ERM Baseline",
@@ -203,12 +222,32 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
             f"{test['worst_domain_accuracy']:.6f} | {test['worst_domain_macro_f1']:.6f} | "
             f"{test['domain_std_accuracy']:.6f} |"
         ),
-        "",
-        "## Best Epochs",
-        "",
-        "| metric | epoch | test_loss | accuracy | macro_f1 | worst_domain_macro_f1 |",
-        "| --- | ---: | ---: | ---: | ---: | ---: |",
     ]
+    if train_eval is not None:
+        lines.extend(
+            [
+                "",
+                "## Source Train Evaluation",
+                "",
+                "| loss | accuracy | macro_f1 | worst_domain_accuracy | worst_domain_macro_f1 | domain_std_accuracy |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: |",
+                (
+                    f"| {train_eval['loss']:.6f} | {train_eval['accuracy']:.6f} | "
+                    f"{train_eval['macro_f1']:.6f} | {train_eval['worst_domain_accuracy']:.6f} | "
+                    f"{train_eval['worst_domain_macro_f1']:.6f} | "
+                    f"{train_eval['domain_std_accuracy']:.6f} |"
+                ),
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Best Epochs",
+            "",
+            "| metric | epoch | test_loss | accuracy | macro_f1 | worst_domain_macro_f1 |",
+            "| --- | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
     for metric_name, record in best.items():
         record_test = record["test"]
         lines.append(

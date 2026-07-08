@@ -117,4 +117,24 @@ results/widar3_erm/amplitude_only_metrics.json
 results/widar3_erm/amplitude_only_metrics.md
 ```
 
-The metrics include final-epoch scores, best epochs by target accuracy / macro-F1 / worst-domain macro-F1, plus per-domain and per-class diagnostics at the best macro-F1 epoch. The checkpoint is written to `results/widar3_erm/amplitude_only_checkpoint.pt` and is ignored by Git.
+The metrics include source-train evaluation, final-epoch target scores, best epochs by target accuracy / macro-F1 / worst-domain macro-F1, plus per-domain and per-class diagnostics at the best macro-F1 epoch. The checkpoint is written to `results/widar3_erm/amplitude_only_checkpoint.pt` and is ignored by Git.
+
+Run a tiny-subset overfit diagnostic if target-domain ERM looks suspiciously low:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/overfit_widar3_erm_subset.py \
+  --data-root /home/ccl/data/csi-carat \
+  --samples-per-class 16 \
+  --epochs 100 \
+  --device cuda \
+  --output-dir results/widar3_erm
+```
+
+Expected diagnostic outputs:
+
+```text
+results/widar3_erm/overfit_subset_metrics.json
+results/widar3_erm/overfit_subset_metrics.md
+```
+
+If the tiny subset cannot approach the target accuracy, debug labels/features/model capacity before building CSI-CARAT. If it overfits but target-domain ERM stays low, the failure is cross-domain generalization, which is exactly the setting CSI-CARAT is meant to address.

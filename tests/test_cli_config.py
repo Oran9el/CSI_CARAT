@@ -18,6 +18,7 @@ def test_scripts_are_importable():
     import scripts.clean_widar3_g6d as clean_script
     import scripts.evaluate as evaluate_script
     import scripts.extract_widar3_features as feature_script
+    import scripts.overfit_widar3_erm_subset as overfit_script
     import scripts.preprocess_widar3_g6d as preprocess_script
     import scripts.report_widar3_features as report_script
     import scripts.train as train_script
@@ -32,3 +33,4 @@ def test_scripts_are_importable():
     assert callable(report_script.main)
     assert callable(erm_script.main)
     assert callable(erm_baseline_script.main)
+    assert callable(overfit_script.main)
