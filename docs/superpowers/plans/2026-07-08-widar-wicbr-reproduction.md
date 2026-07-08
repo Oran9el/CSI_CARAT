@@ -66,4 +66,4 @@
 - [x] **Step 1: Write failing CLI/config import test**
 - [x] **Step 2: Run targeted tests and observe RED**
 - [x] **Step 3: Implement runner, config, docs, and optional dependency metadata**
-- [ ] **Step 4: Run full verification, commit, and push**
+- [x] **Step 4: Run full verification, commit, and push**
