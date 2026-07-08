@@ -1,0 +1,60 @@
+{
+  "risk_etas": [
+    2.0
+  ],
+  "risk_weights": [
+    0.25,
+    0.5,
+    1.0
+  ],
+  "runs": [
+    {
+      "best_accuracy": 0.42340338230133057,
+      "best_macro_epoch": 9,
+      "best_macro_f1": 0.44690798223018646,
+      "best_macro_worst_domain_macro_f1": 0.08247670073372622,
+      "best_worst_accuracy": 0.40989580750465393,
+      "best_worst_domain_macro_f1": 0.09042263062049945,
+      "best_worst_epoch": 4,
+      "domain8_accuracy_at_best_macro": 0.13754111528396606,
+      "domain8_macro_f1_at_best_macro": 0.08247670073372622,
+      "risk_eta": 2.0,
+      "risk_weight": 0.25,
+      "run_name": "risk_multibranch_w0p25_eta2p0",
+      "source_final_macro_f1": 0.4899163444836934,
+      "source_final_worst_domain_macro_f1": 0.1024571160475413
+    },
+    {
+      "best_accuracy": 0.41415441036224365,
+      "best_macro_epoch": 9,
+      "best_macro_f1": 0.4349680542945862,
+      "best_macro_worst_domain_macro_f1": 0.07628148250902693,
+      "best_worst_accuracy": 0.3264649212360382,
+      "best_worst_domain_macro_f1": 0.12467258656397462,
+      "best_worst_epoch": 1,
+      "domain8_accuracy_at_best_macro": 0.09971217066049576,
+      "domain8_macro_f1_at_best_macro": 0.07628148250902693,
+      "risk_eta": 2.0,
+      "risk_weight": 0.5,
+      "run_name": "risk_multibranch_w0p5_eta2p0",
+      "source_final_macro_f1": 0.49417878687381744,
+      "source_final_worst_domain_macro_f1": 0.10562413930892944
+    },
+    {
+      "best_accuracy": 0.407656729221344,
+      "best_macro_epoch": 10,
+      "best_macro_f1": 0.43311821420987445,
+      "best_macro_worst_domain_macro_f1": 0.08133253812169035,
+      "best_worst_accuracy": 0.35816308856010437,
+      "best_worst_domain_macro_f1": 0.1007816637866199,
+      "best_worst_epoch": 1,
+      "domain8_accuracy_at_best_macro": 0.10587993264198303,
+      "domain8_macro_f1_at_best_macro": 0.08133253812169035,
+      "risk_eta": 2.0,
+      "risk_weight": 1.0,
+      "run_name": "risk_multibranch_w1p0_eta2p0",
+      "source_final_macro_f1": 0.5118819276491801,
+      "source_final_worst_domain_macro_f1": 0.10040536522865295
+    }
+  ]
+}
