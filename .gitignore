@@ -20,3 +20,4 @@ checkpoints/
 *.pkl
 *.npy
 *.npz
+docs/reports/2026-07-09-csi-carat-progress-report.md
