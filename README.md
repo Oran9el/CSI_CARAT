@@ -306,6 +306,8 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr.py \
   --contrastive-weight 0.1 \
   --temperature 0.1 \
   --source-val-fraction 0.1 \
+  --source-val-strategy leave_one_domain \
+  --source-val-domain -1 \
   --selection-split source_val \
   --selection-metric macro_f1 \
   --backbone resnet18 \
@@ -322,7 +324,7 @@ results/widar3_wicbr/wicbr_metrics.md
 
 For a dependency-light smoke test, replace `--backbone resnet18` with `--backbone small --max-steps-per-epoch 20 --no-checkpoint`. The ResNet18 path is closer to the Wi-CBR code release; the small path only validates the CSI-CARAT training plumbing.
 
-The checkpoint's `best_model_state_dict` is selected by source-val metrics when `--source-val-fraction` is positive. Target-test best epochs are still written as diagnostics, but should not be used for formal model selection.
+The checkpoint's `best_model_state_dict` is selected by source-val metrics when `--source-val-fraction` is positive. Use `--source-val-strategy leave_one_domain` to hold out one full source domain instead of a random stratified split. Target-test best epochs are still written as diagnostics, but should not be used for formal model selection.
 
 Run Wi-CBR ablations:
 
@@ -334,6 +336,8 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr_ablation.py \
   --epochs 30 \
   --learning-rate 0.0001 \
   --source-val-fraction 0.1 \
+  --source-val-strategy leave_one_domain \
+  --source-val-domain -1 \
   --selection-split source_val \
   --selection-metric macro_f1 \
   --backbone resnet18 \
@@ -364,6 +368,8 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr_carat.py \
   --disentangle-weight 0.1 \
   --contrastive-weight 0.1 \
   --source-val-fraction 0.1 \
+  --source-val-strategy leave_one_domain \
+  --source-val-domain -1 \
   --selection-split source_val \
   --selection-metric macro_f1 \
   --backbone resnet18 \
@@ -377,3 +383,23 @@ Expected Wi-CBR-CARAT outputs:
 results/widar3_wicbr_carat/wicbr_carat_metrics.json
 results/widar3_wicbr_carat/wicbr_carat_metrics.md
 ```
+
+Run the domain-8-focused LODO sweep:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/sweep_widar3_domain8_focus.py \
+  --data-root /home/ccl/data/csi-carat \
+  --candidates wicbr_full,phase_only,no_fusion,wicbr_carat \
+  --batch-size 10 \
+  --epochs 30 \
+  --learning-rate 0.0001 \
+  --source-val-strategy leave_one_domain \
+  --source-val-domain -1 \
+  --selection-split source_val \
+  --selection-metric macro_f1 \
+  --backbone resnet18 \
+  --device cuda \
+  --output-dir results/widar3_domain8_focus
+```
+
+`--source-val-domain -1` deterministically holds out the highest source domain id. Repeat with explicit values such as `--source-val-domain 9` through `15` when running a fuller leave-one-source-domain-out audit.

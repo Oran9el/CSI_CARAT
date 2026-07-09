@@ -21,6 +21,7 @@ def test_widar_config_exists_and_points_to_server_root():
     assert "run_name: wicbr" in text
     assert "wicbr_ablation" in text
     assert "run_name: wicbr_carat" in text
+    assert "domain8_focus" in text
 
 
 def test_scripts_are_importable():
@@ -41,6 +42,7 @@ def test_scripts_are_importable():
     import scripts.train_widar3_wicbr_ablation as wicbr_ablation_script
     import scripts.train_widar3_wicbr_carat as wicbr_carat_script
     import scripts.train_widar3_wicbr as wicbr_script
+    import scripts.sweep_widar3_domain8_focus as domain8_sweep_script
     import scripts.sweep_widar3_risk_multibranch as risk_sweep_script
 
     assert callable(clean_script.main)
@@ -61,3 +63,4 @@ def test_scripts_are_importable():
     assert callable(wicbr_script.main)
     assert callable(wicbr_ablation_script.main)
     assert callable(wicbr_carat_script.main)
+    assert callable(domain8_sweep_script.main)

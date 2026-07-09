@@ -170,6 +170,8 @@ wicbr:
   contrastive_weight: 0.1
   temperature: 0.1
   source_val_fraction: 0.1
+  source_val_strategy: leave_one_domain
+  source_val_domain: -1
   selection_split: source_val
   selection_metric: macro_f1
   seed: 3407
@@ -183,6 +185,8 @@ wicbr_ablation:
   learning_rate: 0.0001
   weight_decay: 0.0001
   source_val_fraction: 0.1
+  source_val_strategy: leave_one_domain
+  source_val_domain: -1
   selection_split: source_val
   selection_metric: macro_f1
   seed: 3407
@@ -207,8 +211,25 @@ wicbr_carat:
   contrastive_weight: 0.1
   temperature: 0.1
   source_val_fraction: 0.1
+  source_val_strategy: leave_one_domain
+  source_val_domain: -1
   selection_split: source_val
   selection_metric: macro_f1
+  seed: 3407
+
+domain8_focus:
+  output_dir: results/widar3_domain8_focus
+  candidates: wicbr_full,phase_only,no_fusion,wicbr_carat
+  backbone: resnet18
+  batch_size: 10
+  epochs: 30
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  source_val_strategy: leave_one_domain
+  source_val_domain: -1
+  selection_split: source_val
+  selection_metric: macro_f1
+  target_domain: 8
   seed: 3407
 
 tta:

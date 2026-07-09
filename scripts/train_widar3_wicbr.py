@@ -15,7 +15,11 @@ for import_root in (PROJECT_ROOT, SRC_ROOT):
 import torch
 from torch.utils.data import DataLoader, Subset
 
-from csi_carat.data.splits import stratified_source_val_indices
+from csi_carat.data.splits import (
+    choose_default_source_val_domain,
+    leave_one_domain_source_val_indices,
+    stratified_source_val_indices,
+)
 from csi_carat.data.paths import WidarG6DPaths
 from csi_carat.data.widar3_dataset import WidarFeatureDataset
 from csi_carat.engine.erm import evaluate_erm
@@ -49,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-fusion", dest="use_fusion", action="store_false")
     parser.set_defaults(use_fusion=True)
     parser.add_argument("--source-val-fraction", type=float, default=0.1)
+    parser.add_argument("--source-val-strategy", choices=["stratified", "leave_one_domain"], default="leave_one_domain")
+    parser.add_argument("--source-val-domain", type=int, default=-1)
     parser.add_argument("--selection-split", choices=["source_val", "test"], default="source_val")
     parser.add_argument("--selection-metric", choices=["macro_f1", "accuracy", "worst_domain_macro_f1"], default="macro_f1")
     parser.add_argument("--pretrained", dest="pretrained", action="store_true", default=True)
@@ -74,11 +80,14 @@ def main(argv: list[str] | None = None) -> int:
     test_dataset = WidarFeatureDataset(test_cache, branches=WICBR_FEATURE_KEYS)
     fit_dataset = train_dataset
     source_val_dataset = None
+    source_val_domain = None
     if args.source_val_fraction > 0:
-        fit_dataset, source_val_dataset = make_source_train_val_subsets(
+        fit_dataset, source_val_dataset, source_val_domain = make_source_train_val_subsets(
             train_dataset,
             val_fraction=args.source_val_fraction,
             seed=args.seed,
+            strategy=args.source_val_strategy,
+            val_domain=None if args.source_val_domain < 0 else args.source_val_domain,
         )
     train_loader = DataLoader(
         fit_dataset,
@@ -213,6 +222,8 @@ def main(argv: list[str] | None = None) -> int:
         "num_train": len(train_dataset),
         "num_fit": len(fit_dataset),
         "num_source_val": len(source_val_dataset) if source_val_dataset is not None else 0,
+        "source_val_strategy": args.source_val_strategy,
+        "source_val_domain": source_val_domain,
         "num_test": len(test_dataset),
         "args": vars(args),
         "history": history,
@@ -261,11 +272,24 @@ def _build_model(args) -> torch.nn.Module:
     )
 
 
-def make_source_train_val_subsets(dataset: WidarFeatureDataset, val_fraction: float, seed: int) -> tuple[Subset, Subset]:
+def make_source_train_val_subsets(
+    dataset: WidarFeatureDataset,
+    val_fraction: float,
+    seed: int,
+    strategy: str = "stratified",
+    val_domain: int | None = None,
+) -> tuple[Subset, Subset, int | None]:
     labels = torch.as_tensor(dataset.cache["activities"], dtype=torch.long)
     domains = torch.as_tensor(dataset.cache["domains"], dtype=torch.long)
-    train_indices, val_indices = stratified_source_val_indices(labels, domains, val_fraction=val_fraction, seed=seed)
-    return Subset(dataset, train_indices), Subset(dataset, val_indices)
+    if strategy == "stratified":
+        train_indices, val_indices = stratified_source_val_indices(labels, domains, val_fraction=val_fraction, seed=seed)
+        heldout_domain = None
+    elif strategy == "leave_one_domain":
+        heldout_domain = val_domain if val_domain is not None else choose_default_source_val_domain(domains)
+        train_indices, val_indices = leave_one_domain_source_val_indices(domains, val_domain=heldout_domain)
+    else:
+        raise ValueError("source-val strategy must be one of: stratified, leave_one_domain.")
+    return Subset(dataset, train_indices), Subset(dataset, val_indices), heldout_domain
 
 
 def checkpoint_score(record: dict, split: str, metric: str) -> float:

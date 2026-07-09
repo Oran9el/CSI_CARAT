@@ -1,6 +1,10 @@
 import torch
 
-from csi_carat.data.splits import stratified_source_val_indices
+from csi_carat.data.splits import (
+    choose_default_source_val_domain,
+    leave_one_domain_source_val_indices,
+    stratified_source_val_indices,
+)
 from csi_carat.engine.wicbr_carat import (
     adapt_wicbr_carat_tta_step,
     train_one_wicbr_carat_step,
@@ -12,6 +16,7 @@ from scripts.train_widar3_wicbr import (
     selected_record_payload,
 )
 from scripts.train_widar3_wicbr_ablation import build_ablation_specs, parse_run_names
+from scripts.sweep_widar3_domain8_focus import build_domain8_specs, parse_candidate_names
 
 
 def test_stratified_source_val_indices_are_deterministic_and_cover_each_stratum():
@@ -31,11 +36,43 @@ def test_stratified_source_val_indices_are_deterministic_and_cover_each_stratum(
 def test_make_source_train_val_subsets_uses_dataset_labels_and_domains():
     dataset = _TinyFeatureDataset()
 
-    train_subset, val_subset = make_source_train_val_subsets(dataset, val_fraction=0.5, seed=3)
+    train_subset, val_subset, val_domain = make_source_train_val_subsets(dataset, val_fraction=0.5, seed=3)
 
     assert len(train_subset) == 4
     assert len(val_subset) == 4
+    assert val_domain is None
     assert sorted(train_subset.indices + val_subset.indices) == list(range(8))
+
+
+def test_leave_one_domain_source_val_indices_hold_out_complete_domain():
+    domains = torch.tensor([9, 9, 10, 10, 11, 11], dtype=torch.long)
+
+    train_indices, val_indices = leave_one_domain_source_val_indices(domains, val_domain=10)
+
+    assert train_indices == [0, 1, 4, 5]
+    assert val_indices == [2, 3]
+
+
+def test_choose_default_source_val_domain_uses_highest_source_domain():
+    domains = torch.tensor([9, 9, 10, 11, 11, 15, 15], dtype=torch.long)
+
+    assert choose_default_source_val_domain(domains) == 15
+
+
+def test_make_source_train_val_subsets_supports_leave_one_domain_strategy():
+    dataset = _TinyFeatureDataset()
+
+    train_subset, val_subset, val_domain = make_source_train_val_subsets(
+        dataset,
+        val_fraction=0.5,
+        seed=3,
+        strategy="leave_one_domain",
+        val_domain=10,
+    )
+
+    assert train_subset.indices == [0, 1, 4, 5]
+    assert val_subset.indices == [2, 3, 6, 7]
+    assert val_domain == 10
 
 
 def test_checkpoint_score_prefers_source_val_when_available():
@@ -67,6 +104,16 @@ def test_build_ablation_specs_maps_names_to_training_arguments():
     assert by_name["wicbr_dfs_only"].extra_args == ("--branch-mode", "dfs")
     assert by_name["wicbr_no_fusion"].extra_args == ("--no-fusion",)
     assert by_name["wicbr_no_contrastive"].extra_args == ("--contrastive-weight", "0.0")
+
+
+def test_build_domain8_specs_includes_fair_baseline_and_domain8_candidates():
+    specs = build_domain8_specs(parse_candidate_names("wicbr_full,phase_only,no_fusion,wicbr_carat"))
+
+    by_name = {spec.run_name: spec for spec in specs}
+    assert by_name["wicbr_lodo_full"].script == "scripts/train_widar3_wicbr.py"
+    assert by_name["wicbr_lodo_phase_only"].extra_args == ("--branch-mode", "phase")
+    assert by_name["wicbr_lodo_no_fusion"].extra_args == ("--no-fusion",)
+    assert by_name["wicbr_carat_lodo"].script == "scripts/train_widar3_wicbr_carat.py"
 
 
 def test_train_one_wicbr_carat_step_reports_loss_parts_and_updates_parameters():
