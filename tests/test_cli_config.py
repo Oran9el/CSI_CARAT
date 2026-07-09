@@ -19,6 +19,8 @@ def test_widar_config_exists_and_points_to_server_root():
     assert "risk_weights: 0.25,0.5,1.0" in text
     assert "wicbr_cache_root" in text
     assert "run_name: wicbr" in text
+    assert "wicbr_ablation" in text
+    assert "run_name: wicbr_carat" in text
 
 
 def test_scripts_are_importable():
@@ -36,6 +38,8 @@ def test_scripts_are_importable():
     import scripts.train_widar3_risk_multibranch as risk_multibranch_script
     import scripts.train_widar3_risk_transformer_multibranch as risk_transformer_script
     import scripts.train_widar3_transformer_multibranch as transformer_script
+    import scripts.train_widar3_wicbr_ablation as wicbr_ablation_script
+    import scripts.train_widar3_wicbr_carat as wicbr_carat_script
     import scripts.train_widar3_wicbr as wicbr_script
     import scripts.sweep_widar3_risk_multibranch as risk_sweep_script
 
@@ -55,3 +59,5 @@ def test_scripts_are_importable():
     assert callable(risk_sweep_script.main)
     assert callable(transformer_script.main)
     assert callable(wicbr_script.main)
+    assert callable(wicbr_ablation_script.main)
+    assert callable(wicbr_carat_script.main)

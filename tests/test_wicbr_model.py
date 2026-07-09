@@ -4,6 +4,7 @@ from csi_carat.engine.wicbr import train_one_wicbr_step
 from csi_carat.models.wicbr import (
     DPFusion,
     ProxyContrastiveLoss,
+    WiCbrCaratClassifier,
     WiCbrCnnClassifier,
     WiCbrSpatialGate,
 )
@@ -54,6 +55,34 @@ def test_wicbr_cnn_classifier_forward_shape_and_embedding():
     assert embeddings.shape == (4, 32)
 
 
+def test_wicbr_cnn_classifier_supports_phase_only_and_dfs_only_ablations():
+    phase_only = WiCbrCnnClassifier(num_classes=6, branch_channels=8, branch_mode="phase")
+    dfs_only = WiCbrCnnClassifier(num_classes=6, branch_channels=8, branch_mode="dfs")
+    phase = torch.randn(3, 3, 32, 32)
+    dfs = torch.randn(3, 3, 32, 32)
+
+    phase_logits, phase_embeddings = phase_only(phase, dfs, return_embedding=True)
+    dfs_logits, dfs_embeddings = dfs_only(phase, dfs, return_embedding=True)
+
+    assert phase_logits.shape == (3, 6)
+    assert dfs_logits.shape == (3, 6)
+    assert phase_embeddings.shape == (3, 8)
+    assert dfs_embeddings.shape == (3, 8)
+
+
+def test_wicbr_cnn_classifier_supports_no_fusion_ablation():
+    model = WiCbrCnnClassifier(num_classes=6, branch_channels=8, use_fusion=False)
+
+    logits, embeddings = model(
+        wicbr_phase_image=torch.randn(3, 3, 32, 32),
+        wicbr_dfs_image=torch.randn(3, 3, 32, 32),
+        return_embedding=True,
+    )
+
+    assert logits.shape == (3, 6)
+    assert embeddings.shape == (3, 16)
+
+
 def test_train_one_wicbr_step_updates_parameters_and_reports_losses():
     model = WiCbrCnnClassifier(num_classes=6, branch_channels=8)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
@@ -75,3 +104,30 @@ def test_train_one_wicbr_step_updates_parameters_and_reports_losses():
     assert set(metrics) == {"loss", "ce_loss", "contrastive_loss"}
     assert torch.isfinite(metrics["loss"])
     assert not torch.allclose(before, model.classifier.weight.detach())
+
+
+def test_wicbr_carat_classifier_returns_factor_outputs_and_logits():
+    model = WiCbrCaratClassifier(
+        num_classes=6,
+        num_domains=3,
+        branch_channels=8,
+        factor_dim=4,
+    )
+
+    outputs = model(
+        wicbr_phase_image=torch.randn(2, 3, 32, 32),
+        wicbr_dfs_image=torch.randn(2, 3, 32, 32),
+        return_outputs=True,
+    )
+    logits = model(
+        wicbr_phase_image=torch.randn(2, 3, 32, 32),
+        wicbr_dfs_image=torch.randn(2, 3, 32, 32),
+    )
+
+    assert outputs["logits"].shape == (2, 6)
+    assert outputs["domain_logits"].shape == (2, 3)
+    assert outputs["features"].shape == (2, 16)
+    assert outputs["fused"].shape == (2, 4)
+    assert outputs["gate"].shape == (2, 1)
+    assert outputs["factors"]["action"].shape == (2, 4)
+    assert logits.shape == (2, 6)

@@ -169,6 +169,46 @@ wicbr:
   weight_decay: 0.0001
   contrastive_weight: 0.1
   temperature: 0.1
+  source_val_fraction: 0.1
+  selection_split: source_val
+  selection_metric: macro_f1
+  seed: 3407
+
+wicbr_ablation:
+  output_dir: results/widar3_wicbr_ablation
+  runs: phase_only,dfs_only,no_fusion,no_contrastive
+  backbone: resnet18
+  batch_size: 10
+  epochs: 30
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  source_val_fraction: 0.1
+  selection_split: source_val
+  selection_metric: macro_f1
+  seed: 3407
+
+wicbr_carat:
+  train_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/wicbr_cache/widar3-g6_wicbr_train_cache.pkl
+  test_cache: /home/ccl/data/csi-carat/widar3/widar3g6d/wicbr_cache/widar3-g6_wicbr_test_cache.pkl
+  output_dir: results/widar3_wicbr_carat
+  run_name: wicbr_carat
+  backbone: resnet18
+  branch_mode: both
+  use_fusion: true
+  batch_size: 10
+  epochs: 30
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  factor_dim: 32
+  risk_weight: 0.25
+  risk_eta: 2.0
+  domain_weight: 0.1
+  disentangle_weight: 0.1
+  contrastive_weight: 0.1
+  temperature: 0.1
+  source_val_fraction: 0.1
+  selection_split: source_val
+  selection_metric: macro_f1
   seed: 3407
 
 tta:

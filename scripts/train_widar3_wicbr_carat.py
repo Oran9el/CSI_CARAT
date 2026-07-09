@@ -1,9 +1,10 @@
-"""Train and evaluate the Wi-CBR reproduction baseline on Widar3.0-G6D."""
+"""Train Wi-CBR-backed CSI-CARAT on Widar3.0-G6D."""
 
 from __future__ import annotations
 
 import copy
 from pathlib import Path
+import pickle
 import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -13,14 +14,14 @@ for import_root in (PROJECT_ROOT, SRC_ROOT):
         sys.path.insert(0, str(import_root))
 
 import torch
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 
-from csi_carat.data.splits import stratified_source_val_indices
 from csi_carat.data.paths import WidarG6DPaths
 from csi_carat.data.widar3_dataset import WidarFeatureDataset
 from csi_carat.engine.erm import evaluate_erm
-from csi_carat.engine.wicbr import WICBR_FEATURE_KEYS, run_wicbr_epoch
-from csi_carat.models.wicbr import WiCbrCnnClassifier, WiCbrResNet18Classifier
+from csi_carat.engine.wicbr import WICBR_FEATURE_KEYS
+from csi_carat.engine.wicbr_carat import run_wicbr_carat_epoch
+from csi_carat.models.wicbr import WiCbrCaratClassifier
 from scripts.train_widar3_erm_baseline import (
     _set_seed,
     _write_json,
@@ -28,14 +29,19 @@ from scripts.train_widar3_erm_baseline import (
     build_parser,
     summarize_best_epochs,
 )
+from scripts.train_widar3_wicbr import (
+    checkpoint_score,
+    make_source_train_val_subsets,
+    selected_record_payload,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    parser.description = "Train the Wi-CBR reproduction baseline on Widar3.0-G6D."
+    parser.description = "Train Wi-CBR-backed CSI-CARAT on Widar3.0-G6D."
     parser.set_defaults(
-        run_name="wicbr",
-        output_dir="results/widar3_wicbr",
+        run_name="wicbr_carat",
+        output_dir="results/widar3_wicbr_carat",
         batch_size=10,
         epochs=30,
         learning_rate=1e-4,
@@ -43,11 +49,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--backbone", choices=["resnet18", "small"], default="resnet18")
     parser.add_argument("--branch-channels", type=int, default=64)
-    parser.add_argument("--contrastive-weight", type=float, default=0.1)
-    parser.add_argument("--temperature", type=float, default=0.1)
+    parser.add_argument("--factor-dim", type=int, default=32)
     parser.add_argument("--branch-mode", choices=["both", "phase", "dfs"], default="both")
     parser.add_argument("--no-fusion", dest="use_fusion", action="store_false")
     parser.set_defaults(use_fusion=True)
+    parser.add_argument("--risk-weight", type=float, default=0.25)
+    parser.add_argument("--risk-eta", type=float, default=2.0)
+    parser.add_argument("--domain-weight", type=float, default=0.1)
+    parser.add_argument("--disentangle-weight", type=float, default=0.1)
+    parser.add_argument("--contrastive-weight", type=float, default=0.1)
+    parser.add_argument("--temperature", type=float, default=0.1)
     parser.add_argument("--source-val-fraction", type=float, default=0.1)
     parser.add_argument("--selection-split", choices=["source_val", "test"], default="source_val")
     parser.add_argument("--selection-metric", choices=["macro_f1", "accuracy", "worst_domain_macro_f1"], default="macro_f1")
@@ -69,8 +80,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.test_cache
         else feature_root / "widar3-g6_wicbr_test_cache.pkl"
     )
+    source_domain_map = source_domain_map_from_cache(train_cache)
 
-    train_dataset = WidarFeatureDataset(train_cache, branches=WICBR_FEATURE_KEYS)
+    train_dataset = WidarFeatureDataset(train_cache, branches=WICBR_FEATURE_KEYS, domain_map=source_domain_map)
     test_dataset = WidarFeatureDataset(test_cache, branches=WICBR_FEATURE_KEYS)
     fit_dataset = train_dataset
     source_val_dataset = None
@@ -80,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
             val_fraction=args.source_val_fraction,
             seed=args.seed,
         )
+
     train_loader = DataLoader(
         fit_dataset,
         batch_size=args.batch_size,
@@ -106,7 +119,17 @@ def main(argv: list[str] | None = None) -> int:
         pin_memory=args.device.startswith("cuda"),
     )
 
-    model = _build_model(args).to(args.device)
+    model = WiCbrCaratClassifier(
+        num_classes=6,
+        num_domains=len(source_domain_map),
+        branch_channels=args.branch_channels,
+        factor_dim=args.factor_dim,
+        backbone=args.backbone,
+        pretrained=args.pretrained,
+        train_backbone=not args.freeze_backbone,
+        branch_mode=args.branch_mode,
+        use_fusion=args.use_fusion,
+    ).to(args.device)
     optimizer = torch.optim.AdamW(
         (parameter for parameter in model.parameters() if parameter.requires_grad),
         lr=args.learning_rate,
@@ -118,12 +141,16 @@ def main(argv: list[str] | None = None) -> int:
     best_selection_score = -1.0
     selected_record = None
     for epoch in range(1, args.epochs + 1):
-        train_metrics = run_wicbr_epoch(
+        train_metrics = run_wicbr_carat_epoch(
             model,
             train_loader,
             optimizer,
             device=args.device,
             max_steps=args.max_steps_per_epoch,
+            risk_weight=args.risk_weight,
+            risk_eta=args.risk_eta,
+            domain_weight=args.domain_weight,
+            disentangle_weight=args.disentangle_weight,
             contrastive_weight=args.contrastive_weight,
             temperature=args.temperature,
         )
@@ -155,6 +182,7 @@ def main(argv: list[str] | None = None) -> int:
                 include_breakdown=True,
                 feature_keys=WICBR_FEATURE_KEYS,
             )
+
         record = {"epoch": epoch, "train": train_metrics, "test": test_metrics}
         if source_val_metrics is not None:
             record["source_val"] = source_val_metrics
@@ -169,28 +197,21 @@ def main(argv: list[str] | None = None) -> int:
             best_state_dict = copy.deepcopy(
                 {key: value.detach().cpu() for key, value in model.state_dict().items()}
             )
-        source_acc = (
-            f" source_acc={train_eval_metrics['accuracy']:.4f}"
-            if train_eval_metrics is not None
-            else ""
-        )
         source_val = (
             f" source_val_{args.selection_metric}={source_val_metrics[args.selection_metric]:.4f}"
             if source_val_metrics is not None
             else ""
         )
         print(
-            "epoch={epoch} loss={loss:.6f} ce={ce:.6f} contrastive={contrastive:.6f} "
-            "test_acc={test_acc:.4f} test_macro_f1={test_f1:.4f} "
-            "worst_domain_acc={worst_acc:.4f}{source_acc}{source_val}".format(
+            "epoch={epoch} loss={loss:.6f} ce={ce:.6f} risk={risk:.6f} domain={domain:.6f} "
+            "test_acc={test_acc:.4f} test_macro_f1={test_f1:.4f}{source_val}".format(
                 epoch=epoch,
                 loss=train_metrics["loss"],
                 ce=train_metrics["ce_loss"],
-                contrastive=train_metrics["contrastive_loss"],
+                risk=train_metrics["risk_loss"],
+                domain=train_metrics["domain_loss"],
                 test_acc=test_metrics["accuracy"],
                 test_f1=test_metrics["macro_f1"],
-                worst_acc=test_metrics["worst_domain_accuracy"],
-                source_acc=source_acc,
                 source_val=source_val,
             )
         )
@@ -205,9 +226,14 @@ def main(argv: list[str] | None = None) -> int:
         "train_cache": str(train_cache),
         "test_cache": str(test_cache),
         "feature_keys": WICBR_FEATURE_KEYS,
+        "source_domain_map": source_domain_map,
         "backbone": args.backbone,
         "branch_mode": args.branch_mode,
         "use_fusion": args.use_fusion,
+        "risk_weight": args.risk_weight,
+        "risk_eta": args.risk_eta,
+        "domain_weight": args.domain_weight,
+        "disentangle_weight": args.disentangle_weight,
         "contrastive_weight": args.contrastive_weight,
         "temperature": args.temperature,
         "num_train": len(train_dataset),
@@ -238,51 +264,15 @@ def main(argv: list[str] | None = None) -> int:
             checkpoint_path,
         )
         print(f"wrote checkpoint to {checkpoint_path}")
-
     print(f"wrote metrics to {metrics_path}")
     print(f"wrote report to {report_path}")
     return 0
 
 
-def _build_model(args) -> torch.nn.Module:
-    if args.backbone == "small":
-        return WiCbrCnnClassifier(
-            num_classes=6,
-            branch_channels=args.branch_channels,
-            branch_mode=args.branch_mode,
-            use_fusion=args.use_fusion,
-        )
-    return WiCbrResNet18Classifier(
-        num_classes=6,
-        pretrained=args.pretrained,
-        train_backbone=not args.freeze_backbone,
-        branch_mode=args.branch_mode,
-        use_fusion=args.use_fusion,
-    )
-
-
-def make_source_train_val_subsets(dataset: WidarFeatureDataset, val_fraction: float, seed: int) -> tuple[Subset, Subset]:
-    labels = torch.as_tensor(dataset.cache["activities"], dtype=torch.long)
-    domains = torch.as_tensor(dataset.cache["domains"], dtype=torch.long)
-    train_indices, val_indices = stratified_source_val_indices(labels, domains, val_fraction=val_fraction, seed=seed)
-    return Subset(dataset, train_indices), Subset(dataset, val_indices)
-
-
-def checkpoint_score(record: dict, split: str, metric: str) -> float:
-    if split not in record:
-        raise KeyError(f"Checkpoint selection split '{split}' is not available in epoch record.")
-    return float(record[split][metric])
-
-
-def selected_record_payload(record: dict, split: str, metric: str) -> dict:
-    return {
-        "epoch": int(record["epoch"]),
-        "selection_split": split,
-        "selection_metric": metric,
-        "selection_score": checkpoint_score(record, split=split, metric=metric),
-        "test": record["test"],
-        "selected_split": record[split],
-    }
+def source_domain_map_from_cache(cache_path: str | Path) -> dict[int, int]:
+    with Path(cache_path).expanduser().open("rb") as handle:
+        cache = pickle.load(handle)
+    return {int(domain): index for index, domain in enumerate(sorted(set(cache["domains"].tolist())))}
 
 
 if __name__ == "__main__":

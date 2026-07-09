@@ -305,6 +305,9 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr.py \
   --learning-rate 0.0001 \
   --contrastive-weight 0.1 \
   --temperature 0.1 \
+  --source-val-fraction 0.1 \
+  --selection-split source_val \
+  --selection-metric macro_f1 \
   --backbone resnet18 \
   --device cuda \
   --output-dir results/widar3_wicbr
@@ -318,3 +321,59 @@ results/widar3_wicbr/wicbr_metrics.md
 ```
 
 For a dependency-light smoke test, replace `--backbone resnet18` with `--backbone small --max-steps-per-epoch 20 --no-checkpoint`. The ResNet18 path is closer to the Wi-CBR code release; the small path only validates the CSI-CARAT training plumbing.
+
+The checkpoint's `best_model_state_dict` is selected by source-val metrics when `--source-val-fraction` is positive. Target-test best epochs are still written as diagnostics, but should not be used for formal model selection.
+
+Run Wi-CBR ablations:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr_ablation.py \
+  --data-root /home/ccl/data/csi-carat \
+  --runs phase_only,dfs_only,no_fusion,no_contrastive \
+  --batch-size 10 \
+  --epochs 30 \
+  --learning-rate 0.0001 \
+  --source-val-fraction 0.1 \
+  --selection-split source_val \
+  --selection-metric macro_f1 \
+  --backbone resnet18 \
+  --device cuda \
+  --output-dir results/widar3_wicbr_ablation
+```
+
+Expected ablation outputs include:
+
+```text
+results/widar3_wicbr_ablation/wicbr_phase_only_metrics.json
+results/widar3_wicbr_ablation/wicbr_dfs_only_metrics.json
+results/widar3_wicbr_ablation/wicbr_no_fusion_metrics.json
+results/widar3_wicbr_ablation/wicbr_no_contrastive_metrics.json
+```
+
+Run the first Wi-CBR-backed CSI-CARAT baseline:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr_carat.py \
+  --data-root /home/ccl/data/csi-carat \
+  --batch-size 10 \
+  --epochs 30 \
+  --learning-rate 0.0001 \
+  --risk-weight 0.25 \
+  --risk-eta 2.0 \
+  --domain-weight 0.1 \
+  --disentangle-weight 0.1 \
+  --contrastive-weight 0.1 \
+  --source-val-fraction 0.1 \
+  --selection-split source_val \
+  --selection-metric macro_f1 \
+  --backbone resnet18 \
+  --device cuda \
+  --output-dir results/widar3_wicbr_carat
+```
+
+Expected Wi-CBR-CARAT outputs:
+
+```text
+results/widar3_wicbr_carat/wicbr_carat_metrics.json
+results/widar3_wicbr_carat/wicbr_carat_metrics.md
+```
