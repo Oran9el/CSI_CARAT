@@ -22,6 +22,7 @@ def test_widar_config_exists_and_points_to_server_root():
     assert "wicbr_ablation" in text
     assert "run_name: wicbr_carat" in text
     assert "domain8_focus" in text
+    assert "wicbr_carat_v2" in text
 
 
 def test_scripts_are_importable():
@@ -31,6 +32,7 @@ def test_scripts_are_importable():
     import scripts.extract_widar3_wicbr_features as wicbr_feature_script
     import scripts.overfit_widar3_erm_subset as overfit_script
     import scripts.preprocess_widar3_g6d as preprocess_script
+    import scripts.report_widar3_lodo_results as lodo_report_script
     import scripts.report_widar3_features as report_script
     import scripts.train as train_script
     import scripts.train_widar3_erm_baseline as erm_baseline_script
@@ -51,6 +53,7 @@ def test_scripts_are_importable():
     assert callable(feature_script.main)
     assert callable(wicbr_feature_script.main)
     assert callable(preprocess_script.main)
+    assert callable(lodo_report_script.main)
     assert callable(report_script.main)
     assert callable(erm_script.main)
     assert callable(erm_baseline_script.main)

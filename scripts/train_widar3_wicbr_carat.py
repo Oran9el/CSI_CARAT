@@ -21,7 +21,7 @@ from csi_carat.data.widar3_dataset import WidarFeatureDataset
 from csi_carat.engine.erm import evaluate_erm
 from csi_carat.engine.wicbr import WICBR_FEATURE_KEYS
 from csi_carat.engine.wicbr_carat import run_wicbr_carat_epoch
-from csi_carat.models.wicbr import WiCbrCaratClassifier
+from csi_carat.models.wicbr import WiCbrCaratClassifier, WiCbrCaratV2Classifier
 from scripts.train_widar3_erm_baseline import (
     _set_seed,
     _write_json,
@@ -48,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
         weight_decay=1e-4,
     )
     parser.add_argument("--backbone", choices=["resnet18", "small"], default="resnet18")
+    parser.add_argument("--carat-version", choices=["v1", "v2"], default="v1")
     parser.add_argument("--branch-channels", type=int, default=64)
     parser.add_argument("--factor-dim", type=int, default=32)
     parser.add_argument("--branch-mode", choices=["both", "phase", "dfs"], default="both")
@@ -124,7 +125,8 @@ def main(argv: list[str] | None = None) -> int:
         pin_memory=args.device.startswith("cuda"),
     )
 
-    model = WiCbrCaratClassifier(
+    model_cls = WiCbrCaratClassifier if args.carat_version == "v1" else WiCbrCaratV2Classifier
+    model = model_cls(
         num_classes=6,
         num_domains=len(source_domain_map),
         branch_channels=args.branch_channels,
@@ -132,8 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         backbone=args.backbone,
         pretrained=args.pretrained,
         train_backbone=not args.freeze_backbone,
-        branch_mode=args.branch_mode,
-        use_fusion=args.use_fusion,
+        **({"branch_mode": args.branch_mode, "use_fusion": args.use_fusion} if args.carat_version == "v1" else {}),
     ).to(args.device)
     optimizer = torch.optim.AdamW(
         (parameter for parameter in model.parameters() if parameter.requires_grad),
@@ -233,6 +234,7 @@ def main(argv: list[str] | None = None) -> int:
         "feature_keys": WICBR_FEATURE_KEYS,
         "source_domain_map": source_domain_map,
         "backbone": args.backbone,
+        "carat_version": args.carat_version,
         "branch_mode": args.branch_mode,
         "use_fusion": args.use_fusion,
         "risk_weight": args.risk_weight,

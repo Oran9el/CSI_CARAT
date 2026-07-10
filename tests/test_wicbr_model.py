@@ -5,6 +5,7 @@ from csi_carat.models.wicbr import (
     DPFusion,
     ProxyContrastiveLoss,
     WiCbrCaratClassifier,
+    WiCbrCaratV2Classifier,
     WiCbrCnnClassifier,
     WiCbrSpatialGate,
 )
@@ -129,5 +130,34 @@ def test_wicbr_carat_classifier_returns_factor_outputs_and_logits():
     assert outputs["features"].shape == (2, 16)
     assert outputs["fused"].shape == (2, 4)
     assert outputs["gate"].shape == (2, 1)
+    assert outputs["factors"]["action"].shape == (2, 4)
+    assert logits.shape == (2, 6)
+
+
+def test_wicbr_carat_v2_returns_branch_aware_outputs():
+    model = WiCbrCaratV2Classifier(
+        num_classes=6,
+        num_domains=3,
+        branch_channels=8,
+        factor_dim=4,
+    )
+
+    outputs = model(
+        wicbr_phase_image=torch.randn(2, 3, 32, 32),
+        wicbr_dfs_image=torch.randn(2, 3, 32, 32),
+        return_outputs=True,
+    )
+    logits = model(
+        wicbr_phase_image=torch.randn(2, 3, 32, 32),
+        wicbr_dfs_image=torch.randn(2, 3, 32, 32),
+    )
+
+    assert outputs["logits"].shape == (2, 6)
+    assert outputs["domain_logits"].shape == (2, 3)
+    assert outputs["features"].shape == (2, 16)
+    assert outputs["fused"].shape == (2, 4)
+    assert outputs["gate"].shape == (2, 2, 4)
+    assert outputs["branch_factors"]["phase"]["action"].shape == (2, 4)
+    assert outputs["branch_factors"]["dfs"]["action"].shape == (2, 4)
     assert outputs["factors"]["action"].shape == (2, 4)
     assert logits.shape == (2, 6)

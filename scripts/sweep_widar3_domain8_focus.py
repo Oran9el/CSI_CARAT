@@ -30,6 +30,12 @@ DOMAIN8_SPECS = {
     "phase_only": Domain8Spec("phase_only", "wicbr_lodo_phase_only", "scripts/train_widar3_wicbr.py", ("--branch-mode", "phase")),
     "no_fusion": Domain8Spec("no_fusion", "wicbr_lodo_no_fusion", "scripts/train_widar3_wicbr.py", ("--no-fusion",)),
     "wicbr_carat": Domain8Spec("wicbr_carat", "wicbr_carat_lodo", "scripts/train_widar3_wicbr_carat.py", ()),
+    "wicbr_carat_v2": Domain8Spec(
+        "wicbr_carat_v2",
+        "wicbr_carat_v2_lodo",
+        "scripts/train_widar3_wicbr_carat.py",
+        ("--carat-version", "v2"),
+    ),
     "wicbr_carat_phase": Domain8Spec(
         "wicbr_carat_phase",
         "wicbr_carat_lodo_phase",
@@ -41,7 +47,7 @@ DOMAIN8_SPECS = {
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run LODO Wi-CBR candidates and inspect target domain 8.")
-    parser.add_argument("--candidates", default="wicbr_full,phase_only,no_fusion,wicbr_carat")
+    parser.add_argument("--candidates", default="wicbr_full,phase_only,no_fusion,wicbr_carat,wicbr_carat_v2")
     parser.add_argument("--data-root", default="/home/ccl/data/csi-carat")
     parser.add_argument("--train-cache", default="")
     parser.add_argument("--test-cache", default="")

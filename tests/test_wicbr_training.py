@@ -10,6 +10,13 @@ from csi_carat.engine.wicbr_carat import (
     train_one_wicbr_carat_step,
 )
 from csi_carat.models.wicbr import WiCbrCaratClassifier
+from csi_carat.models.wicbr import WiCbrCaratV2Classifier
+from scripts.report_widar3_lodo_results import (
+    LodoMetricRecord,
+    aggregate_lodo_records,
+    collect_lodo_metric_records,
+    write_lodo_markdown,
+)
 from scripts.train_widar3_wicbr import (
     checkpoint_score,
     make_source_train_val_subsets,
@@ -107,13 +114,14 @@ def test_build_ablation_specs_maps_names_to_training_arguments():
 
 
 def test_build_domain8_specs_includes_fair_baseline_and_domain8_candidates():
-    specs = build_domain8_specs(parse_candidate_names("wicbr_full,phase_only,no_fusion,wicbr_carat"))
+    specs = build_domain8_specs(parse_candidate_names("wicbr_full,phase_only,no_fusion,wicbr_carat,wicbr_carat_v2"))
 
     by_name = {spec.run_name: spec for spec in specs}
     assert by_name["wicbr_lodo_full"].script == "scripts/train_widar3_wicbr.py"
     assert by_name["wicbr_lodo_phase_only"].extra_args == ("--branch-mode", "phase")
     assert by_name["wicbr_lodo_no_fusion"].extra_args == ("--no-fusion",)
     assert by_name["wicbr_carat_lodo"].script == "scripts/train_widar3_wicbr_carat.py"
+    assert by_name["wicbr_carat_v2_lodo"].extra_args == ("--carat-version", "v2")
 
 
 def test_train_one_wicbr_carat_step_reports_loss_parts_and_updates_parameters():
@@ -144,6 +152,26 @@ def test_train_one_wicbr_carat_step_reports_loss_parts_and_updates_parameters():
     assert not torch.allclose(before, model.classifier.weight.detach())
 
 
+def test_train_one_wicbr_carat_step_accepts_v2_model():
+    model = WiCbrCaratV2Classifier(num_classes=6, num_domains=2, branch_channels=8, factor_dim=4)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    batch = _wicbr_batch()
+    before = model.classifier.weight.detach().clone()
+
+    metrics = train_one_wicbr_carat_step(
+        model,
+        batch,
+        optimizer,
+        risk_weight=0.2,
+        domain_weight=0.1,
+        disentangle_weight=0.1,
+        contrastive_weight=0.1,
+    )
+
+    assert torch.isfinite(metrics["loss"])
+    assert not torch.allclose(before, model.classifier.weight.detach())
+
+
 def test_adapt_wicbr_carat_tta_step_updates_only_tta_parameters():
     model = WiCbrCaratClassifier(num_classes=6, num_domains=2, branch_channels=8, factor_dim=4)
     batch = {
@@ -159,6 +187,49 @@ def test_adapt_wicbr_carat_tta_step_updates_only_tta_parameters():
     assert torch.isfinite(metrics["entropy_loss"])
     assert changed
     assert changed.issubset(trainable_names)
+
+
+def test_collect_lodo_metric_records_reads_selected_target_and_domain8_metrics(tmp_path):
+    metrics_dir = tmp_path / "results"
+    _write_metric(metrics_dir / "d9" / "wicbr_lodo_full_metrics.json", "wicbr_lodo_full", 9, 0.80, 0.50)
+    _write_metric(metrics_dir / "d10" / "wicbr_lodo_full_metrics.json", "wicbr_lodo_full", 10, 0.90, 0.60)
+
+    records = collect_lodo_metric_records(metrics_dir)
+
+    assert [record.source_val_domain for record in records] == [9, 10]
+    assert records[0].run_name == "wicbr_lodo_full"
+    assert records[0].target_macro_f1 == 0.80
+    assert records[1].domain8_macro_f1 == 0.60
+
+
+def test_aggregate_lodo_records_returns_mean_and_std_by_run():
+    records = [
+        LodoMetricRecord("a", 9, 1, 0.7, 0.8, 0.5, 0.5, "a.json"),
+        LodoMetricRecord("a", 10, 2, 0.8, 0.9, 0.7, 0.7, "b.json"),
+        LodoMetricRecord("b", 9, 1, 0.6, 0.6, 0.4, 0.4, "c.json"),
+    ]
+
+    summary = aggregate_lodo_records(records)
+
+    assert summary["a"]["n"] == 2
+    assert round(summary["a"]["target_macro_f1_mean"], 4) == 0.85
+    assert round(summary["a"]["domain8_macro_f1_std"], 4) == 0.1
+    assert summary["b"]["n"] == 1
+
+
+def test_write_lodo_markdown_includes_domain8_columns(tmp_path):
+    records = [
+        LodoMetricRecord("a", 9, 1, 0.7, 0.8, 0.5, 0.5, "a.json"),
+        LodoMetricRecord("a", 10, 2, 0.8, 0.9, 0.7, 0.7, "b.json"),
+    ]
+    output_path = tmp_path / "summary.md"
+
+    write_lodo_markdown(output_path, records, aggregate_lodo_records(records))
+
+    text = output_path.read_text(encoding="utf-8")
+    assert "domain8_macro_f1" in text
+    assert "target_macro_f1_mean" in text
+    assert "a.json" in text
 
 
 class _TinyFeatureDataset(torch.utils.data.Dataset):
@@ -182,3 +253,23 @@ def _wicbr_batch() -> dict[str, torch.Tensor]:
         "activity": torch.tensor([0, 1, 2, 3], dtype=torch.long),
         "domain": torch.tensor([0, 0, 1, 1], dtype=torch.long),
     }
+
+
+def _write_metric(path, run_name: str, source_val_domain: int, target_f1: float, domain8_f1: float) -> None:
+    import json
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "run_name": run_name,
+        "source_val_domain": source_val_domain,
+        "selected": {
+            "epoch": 3,
+            "selected_split": {"macro_f1": 0.75},
+            "test": {
+                "macro_f1": target_f1,
+                "worst_domain_macro_f1": domain8_f1,
+                "per_domain": {"8": {"macro_f1": domain8_f1}},
+            },
+        },
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")

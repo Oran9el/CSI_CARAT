@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 from csi_carat.models.adapters import Adapter
 from csi_carat.models.backbones.wiflexformer import gradient_reversal
-from csi_carat.models.disentanglement import FactorHead, concatenate_spurious_factors
+from csi_carat.models.disentanglement import FACTOR_NAMES, FactorHead, concatenate_spurious_factors
 from csi_carat.models.gate import RiskGate
 
 
@@ -272,6 +274,103 @@ class WiCbrCaratClassifier(nn.Module):
         }
 
 
+class WiCbrCaratV2Classifier(nn.Module):
+    """Branch-aware CSI-CARAT head with separate phase/DFS factorization."""
+
+    def __init__(
+        self,
+        num_classes: int,
+        num_domains: int,
+        branch_channels: int = 64,
+        factor_dim: int = 32,
+        backbone: str = "small",
+        pretrained: bool = True,
+        train_backbone: bool = True,
+        grl_lambda: float = 1.0,
+    ) -> None:
+        super().__init__()
+        self.grl_lambda = grl_lambda
+        self.branch_channels = 512 if backbone == "resnet18" else branch_channels
+        if backbone == "small":
+            self.phase_encoder = _SmallImageBranchEncoder(branch_channels)
+            self.dfs_encoder = _SmallImageBranchEncoder(branch_channels)
+        elif backbone == "resnet18":
+            self.phase_encoder = _build_resnet18_feature_encoder(pretrained=pretrained)
+            self.dfs_encoder = _build_resnet18_feature_encoder(pretrained=pretrained)
+        else:
+            raise ValueError(f"Unsupported Wi-CBR CARAT v2 backbone: {backbone}")
+        if not train_backbone:
+            for encoder in (self.phase_encoder, self.dfs_encoder):
+                for parameter in encoder.parameters():
+                    parameter.requires_grad = False
+
+        self.phase_gate = WiCbrSpatialGate()
+        self.dfs_gate = WiCbrSpatialGate()
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.phase_factor_head = FactorHead(feature_dim=self.branch_channels, factor_dim=factor_dim)
+        self.dfs_factor_head = FactorHead(feature_dim=self.branch_channels, factor_dim=factor_dim)
+        self.gate = nn.Sequential(
+            nn.Linear(self.branch_channels * 2, max(16, factor_dim * 2)),
+            nn.GELU(),
+            nn.Linear(max(16, factor_dim * 2), factor_dim * 2),
+        )
+        self.classifier = nn.Linear(factor_dim, num_classes)
+        self.domain_discriminator = nn.Sequential(
+            nn.Linear(factor_dim, max(16, factor_dim)),
+            nn.ReLU(),
+            nn.Linear(max(16, factor_dim), num_domains),
+        )
+        self.temperature = nn.Parameter(torch.ones(()))
+
+    def forward(
+        self,
+        wicbr_phase_image: torch.Tensor,
+        wicbr_dfs_image: torch.Tensor,
+        return_outputs: bool = False,
+    ) -> torch.Tensor | dict[str, torch.Tensor | dict[str, torch.Tensor]]:
+        phase_features, dfs_features = self.encode_branches(wicbr_phase_image, wicbr_dfs_image)
+        features = torch.cat([phase_features, dfs_features], dim=1)
+        phase_factors = self.phase_factor_head(phase_features)
+        dfs_factors = self.dfs_factor_head(dfs_features)
+        branch_gate = self.gate(features).view(features.shape[0], 2, -1)
+        branch_gate = torch.softmax(branch_gate, dim=1)
+        factors = OrderedDict(
+            (
+                name,
+                branch_gate[:, 0, :] * phase_factors[name]
+                + branch_gate[:, 1, :] * dfs_factors[name],
+            )
+            for name in FACTOR_NAMES
+        )
+        z_action = factors["action"]
+        fused = z_action
+        logits = self.classifier(fused) / self.temperature.clamp_min(1e-6)
+        domain_logits = self.domain_discriminator(
+            gradient_reversal(z_action, lambda_=self.grl_lambda)
+        )
+        if not return_outputs:
+            return logits
+        return {
+            "features": features,
+            "branch_features": {"phase": phase_features, "dfs": dfs_features},
+            "branch_factors": {"phase": phase_factors, "dfs": dfs_factors},
+            "factors": factors,
+            "gate": branch_gate,
+            "fused": fused,
+            "logits": logits,
+            "domain_logits": domain_logits,
+        }
+
+    def encode_branches(
+        self,
+        wicbr_phase_image: torch.Tensor,
+        wicbr_dfs_image: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        phase_map = self.phase_gate(self.phase_encoder(wicbr_phase_image))
+        dfs_map = self.dfs_gate(self.dfs_encoder(wicbr_dfs_image))
+        return self.pool(phase_map).flatten(1), self.pool(dfs_map).flatten(1)
+
+
 class _SmallImageBranchEncoder(nn.Module):
     def __init__(self, output_channels: int) -> None:
         super().__init__()
@@ -309,3 +408,15 @@ def _validate_branch_mode(branch_mode: str) -> str:
     if branch_mode not in {"both", "phase", "dfs"}:
         raise ValueError("branch_mode must be one of: both, phase, dfs.")
     return branch_mode
+
+
+def _build_resnet18_feature_encoder(pretrained: bool) -> nn.Sequential:
+    try:
+        from torchvision.models import ResNet18_Weights, resnet18
+    except ImportError as exc:
+        raise RuntimeError(
+            "torchvision is required for the ResNet18 Wi-CBR backbone. "
+            "Install with `pip install -e \".[wicbr]\"` or use `--backbone small`."
+        ) from exc
+    weights = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
+    return nn.Sequential(*list(resnet18(weights=weights).children())[:-2])

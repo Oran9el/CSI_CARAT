@@ -384,12 +384,37 @@ results/widar3_wicbr_carat/wicbr_carat_metrics.json
 results/widar3_wicbr_carat/wicbr_carat_metrics.md
 ```
 
+Run the branch-aware Wi-CBR-CARAT v2 baseline:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr_carat.py \
+  --data-root /home/ccl/data/csi-carat \
+  --run-name wicbr_carat_v2 \
+  --batch-size 10 \
+  --epochs 30 \
+  --learning-rate 0.0001 \
+  --risk-weight 0.25 \
+  --risk-eta 2.0 \
+  --domain-weight 0.1 \
+  --disentangle-weight 0.1 \
+  --contrastive-weight 0.1 \
+  --source-val-fraction 0.1 \
+  --source-val-strategy leave_one_domain \
+  --source-val-domain -1 \
+  --selection-split source_val \
+  --selection-metric macro_f1 \
+  --backbone resnet18 \
+  --carat-version v2 \
+  --device cuda \
+  --output-dir results/widar3_wicbr_carat_v2
+```
+
 Run the domain-8-focused LODO sweep:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/sweep_widar3_domain8_focus.py \
   --data-root /home/ccl/data/csi-carat \
-  --candidates wicbr_full,phase_only,no_fusion,wicbr_carat \
+  --candidates wicbr_full,phase_only,no_fusion,wicbr_carat,wicbr_carat_v2 \
   --batch-size 10 \
   --epochs 30 \
   --learning-rate 0.0001 \
@@ -403,3 +428,34 @@ CUDA_VISIBLE_DEVICES=0 python scripts/sweep_widar3_domain8_focus.py \
 ```
 
 `--source-val-domain -1` deterministically holds out the highest source domain id. Repeat with explicit values such as `--source-val-domain 9` through `15` when running a fuller leave-one-source-domain-out audit.
+
+Summarize LODO metrics after pulling or generating all result files:
+
+```bash
+python scripts/report_widar3_lodo_results.py \
+  --results-root results \
+  --output-dir results/widar3_lodo_summary
+```
+
+Expected summary outputs:
+
+```text
+results/widar3_lodo_summary/lodo_records.csv
+results/widar3_lodo_summary/lodo_summary.csv
+results/widar3_lodo_summary/lodo_summary.md
+```
+
+Push result reports after server runs:
+
+```bash
+git add \
+  results/widar3_wicbr_carat_v2/*_metrics.json \
+  results/widar3_wicbr_carat_v2/*_metrics.md \
+  results/widar3_domain8_focus_lodo_d*/*_metrics.json \
+  results/widar3_domain8_focus_lodo_d*/*_metrics.md \
+  results/widar3_lodo_summary/*.csv \
+  results/widar3_lodo_summary/*.md
+
+git commit -m "results: add Wi-CBR CARAT v2 and LODO summary metrics"
+git push origin codex/wicbr-carat-extensions
+```
