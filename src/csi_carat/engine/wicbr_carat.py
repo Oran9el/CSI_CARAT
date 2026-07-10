@@ -28,6 +28,8 @@ def train_one_wicbr_carat_step(
     disentangle_weight: float = 0.1,
     contrastive_weight: float = 0.1,
     temperature: float = 0.1,
+    phase_prior_weight: float = 0.0,
+    phase_prior_target: float = 0.65,
 ) -> dict[str, torch.Tensor]:
     """Run one Wi-CBR-CARAT optimization step."""
 
@@ -42,6 +44,7 @@ def train_one_wicbr_carat_step(
     risk_loss = logsumexp_risk(domain_ce_losses(logits, target, domains), eta=risk_eta)
     domain_loss = F.cross_entropy(outputs["domain_logits"], domains)
     disentangle_loss = _factor_disentangle_loss(outputs["factors"])
+    phase_prior_loss = _phase_prior_loss(outputs, target=phase_prior_target)
     contrastive_loss = torch.zeros((), dtype=ce_loss.dtype, device=ce_loss.device)
     if contrastive_weight > 0:
         contrastive_loss = ProxyContrastiveLoss(temperature=temperature)(
@@ -56,6 +59,7 @@ def train_one_wicbr_carat_step(
         + domain_weight * domain_loss
         + disentangle_weight * disentangle_loss
         + contrastive_weight * contrastive_loss
+        + phase_prior_weight * phase_prior_loss
     )
     loss.backward()
     optimizer.step()
@@ -66,6 +70,7 @@ def train_one_wicbr_carat_step(
         "domain_loss": domain_loss.detach().cpu(),
         "disentangle_loss": disentangle_loss.detach().cpu(),
         "contrastive_loss": contrastive_loss.detach().cpu(),
+        "phase_prior_loss": phase_prior_loss.detach().cpu(),
     }
 
 
@@ -82,6 +87,8 @@ def run_wicbr_carat_epoch(
     disentangle_weight: float = 0.1,
     contrastive_weight: float = 0.1,
     temperature: float = 0.1,
+    phase_prior_weight: float = 0.0,
+    phase_prior_target: float = 0.65,
 ) -> dict[str, float | int]:
     """Run one Wi-CBR-CARAT source epoch and return weighted metrics."""
 
@@ -92,6 +99,7 @@ def run_wicbr_carat_epoch(
         "domain_loss": 0.0,
         "disentangle_loss": 0.0,
         "contrastive_loss": 0.0,
+        "phase_prior_loss": 0.0,
     }
     total_examples = 0
     steps = 0
@@ -109,6 +117,8 @@ def run_wicbr_carat_epoch(
             disentangle_weight=disentangle_weight,
             contrastive_weight=contrastive_weight,
             temperature=temperature,
+            phase_prior_weight=phase_prior_weight,
+            phase_prior_target=phase_prior_target,
         )
         for key in totals:
             totals[key] += float(metrics[key]) * batch_size
@@ -161,12 +171,67 @@ def adapt_wicbr_carat_tta_step(
     return {"entropy_loss": entropy_loss.detach().cpu()}
 
 
+def evaluate_branch_gate_diagnostics(
+    model: nn.Module,
+    dataloader,
+    device: torch.device | str = "cpu",
+    feature_keys: Sequence[str] = WICBR_FEATURE_KEYS,
+) -> dict[str, object]:
+    """Summarize branch gate usage for models that expose phase/DFS gates."""
+
+    model.eval()
+    phase_gates: list[torch.Tensor] = []
+    dfs_gates: list[torch.Tensor] = []
+    domains: list[torch.Tensor] = []
+    with torch.no_grad():
+        for batch in dataloader:
+            inputs = {key: batch[key].to(device) for key in feature_keys}
+            outputs = model(**inputs, return_outputs=True)
+            gate = outputs.get("raw_gate", outputs.get("gate"))
+            if not isinstance(gate, torch.Tensor) or gate.ndim != 3 or gate.shape[1] != 2:
+                return {}
+            phase_gates.append(gate[:, 0, :].mean(dim=1).detach().cpu())
+            dfs_gates.append(gate[:, 1, :].mean(dim=1).detach().cpu())
+            domains.append(batch["domain"].detach().cpu())
+    if not phase_gates:
+        raise RuntimeError("No batches were produced for branch gate diagnostics.")
+    phase = torch.cat(phase_gates, dim=0)
+    dfs = torch.cat(dfs_gates, dim=0)
+    domain_ids = torch.cat(domains, dim=0)
+    return {
+        "overall": _gate_summary(phase, dfs),
+        "per_domain": {
+            str(int(domain.item())): _gate_summary(phase[domain_ids == domain], dfs[domain_ids == domain])
+            for domain in torch.unique(domain_ids)
+        },
+    }
+
+
 def _factor_disentangle_loss(factors: dict[str, torch.Tensor]) -> torch.Tensor:
     action = factors["action"]
     losses = [covariance_penalty(action, factors[name]) for name in FACTOR_NAMES if name != "action"]
     if not losses:
         return action.new_tensor(0.0)
     return torch.stack(losses).mean()
+
+
+def _phase_prior_loss(outputs: dict[str, object], target: float = 0.65) -> torch.Tensor:
+    gate = outputs.get("raw_gate", outputs.get("gate"))
+    logits = outputs["logits"]
+    if not isinstance(gate, torch.Tensor) or gate.ndim != 3 or gate.shape[1] != 2:
+        return logits.new_tensor(0.0)
+    phase_gate_mean = gate[:, 0, :].mean()
+    return torch.relu(phase_gate_mean.new_tensor(target) - phase_gate_mean).pow(2)
+
+
+def _gate_summary(phase: torch.Tensor, dfs: torch.Tensor) -> dict[str, float | int]:
+    return {
+        "samples": int(phase.numel()),
+        "phase_gate_mean": float(phase.mean()),
+        "phase_gate_std": float(phase.std(unbiased=False)),
+        "dfs_gate_mean": float(dfs.mean()),
+        "dfs_gate_std": float(dfs.std(unbiased=False)),
+    }
 
 
 def _classifier_proxies(model: nn.Module) -> torch.Tensor:

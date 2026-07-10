@@ -287,9 +287,13 @@ class WiCbrCaratV2Classifier(nn.Module):
         pretrained: bool = True,
         train_backbone: bool = True,
         grl_lambda: float = 1.0,
+        branch_dropout: float = 0.0,
     ) -> None:
         super().__init__()
+        if not 0.0 <= branch_dropout <= 1.0:
+            raise ValueError("branch_dropout must be in [0, 1].")
         self.grl_lambda = grl_lambda
+        self.branch_dropout = branch_dropout
         self.branch_channels = 512 if backbone == "resnet18" else branch_channels
         if backbone == "small":
             self.phase_encoder = _SmallImageBranchEncoder(branch_channels)
@@ -332,8 +336,9 @@ class WiCbrCaratV2Classifier(nn.Module):
         features = torch.cat([phase_features, dfs_features], dim=1)
         phase_factors = self.phase_factor_head(phase_features)
         dfs_factors = self.dfs_factor_head(dfs_features)
-        branch_gate = self.gate(features).view(features.shape[0], 2, -1)
-        branch_gate = torch.softmax(branch_gate, dim=1)
+        raw_branch_gate = self.gate(features).view(features.shape[0], 2, -1)
+        raw_branch_gate = torch.softmax(raw_branch_gate, dim=1)
+        branch_gate = self._apply_branch_dropout(raw_branch_gate)
         factors = OrderedDict(
             (
                 name,
@@ -355,6 +360,7 @@ class WiCbrCaratV2Classifier(nn.Module):
             "branch_features": {"phase": phase_features, "dfs": dfs_features},
             "branch_factors": {"phase": phase_factors, "dfs": dfs_factors},
             "factors": factors,
+            "raw_gate": raw_branch_gate,
             "gate": branch_gate,
             "fused": fused,
             "logits": logits,
@@ -369,6 +375,23 @@ class WiCbrCaratV2Classifier(nn.Module):
         phase_map = self.phase_gate(self.phase_encoder(wicbr_phase_image))
         dfs_map = self.dfs_gate(self.dfs_encoder(wicbr_dfs_image))
         return self.pool(phase_map).flatten(1), self.pool(dfs_map).flatten(1)
+
+    def _apply_branch_dropout(self, branch_gate: torch.Tensor) -> torch.Tensor:
+        if not self.training or self.branch_dropout <= 0.0:
+            return branch_gate
+        batch_size, _, factor_dim = branch_gate.shape
+        apply_dropout = torch.rand(batch_size, 1, 1, device=branch_gate.device) < self.branch_dropout
+        keep_branch = torch.randint(0, 2, (batch_size, 1, 1), device=branch_gate.device)
+        dropped_gate = torch.zeros_like(branch_gate)
+        dropped_gate.scatter_(1, keep_branch.expand(-1, -1, factor_dim), 1.0)
+        return torch.where(apply_dropout, dropped_gate, branch_gate)
+
+
+class WiCbrCaratV3Classifier(WiCbrCaratV2Classifier):
+    """CSI-CARAT v3 with branch dropout regularization for phase/DFS gates."""
+
+    def __init__(self, *args, branch_dropout: float = 0.2, **kwargs) -> None:
+        super().__init__(*args, branch_dropout=branch_dropout, **kwargs)
 
 
 class _SmallImageBranchEncoder(nn.Module):

@@ -6,6 +6,7 @@ from csi_carat.models.wicbr import (
     ProxyContrastiveLoss,
     WiCbrCaratClassifier,
     WiCbrCaratV2Classifier,
+    WiCbrCaratV3Classifier,
     WiCbrCnnClassifier,
     WiCbrSpatialGate,
 )
@@ -161,3 +162,26 @@ def test_wicbr_carat_v2_returns_branch_aware_outputs():
     assert outputs["branch_factors"]["dfs"]["action"].shape == (2, 4)
     assert outputs["factors"]["action"].shape == (2, 4)
     assert logits.shape == (2, 6)
+
+
+def test_wicbr_carat_v3_applies_branch_dropout_only_during_training():
+    model = WiCbrCaratV3Classifier(
+        num_classes=6,
+        num_domains=3,
+        branch_channels=8,
+        factor_dim=4,
+        branch_dropout=1.0,
+    )
+    phase = torch.randn(4, 3, 32, 32)
+    dfs = torch.randn(4, 3, 32, 32)
+
+    model.train()
+    train_outputs = model(phase, dfs, return_outputs=True)
+    model.eval()
+    eval_outputs = model(phase, dfs, return_outputs=True)
+
+    assert train_outputs["raw_gate"].shape == (4, 2, 4)
+    assert train_outputs["gate"].shape == (4, 2, 4)
+    assert torch.allclose(train_outputs["gate"].sum(dim=1), torch.ones(4, 4))
+    assert torch.all((train_outputs["gate"] == 0.0) | (train_outputs["gate"] == 1.0))
+    assert not torch.all((eval_outputs["gate"] == 0.0) | (eval_outputs["gate"] == 1.0))

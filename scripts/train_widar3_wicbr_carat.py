@@ -20,8 +20,8 @@ from csi_carat.data.paths import WidarG6DPaths
 from csi_carat.data.widar3_dataset import WidarFeatureDataset
 from csi_carat.engine.erm import evaluate_erm
 from csi_carat.engine.wicbr import WICBR_FEATURE_KEYS
-from csi_carat.engine.wicbr_carat import run_wicbr_carat_epoch
-from csi_carat.models.wicbr import WiCbrCaratClassifier, WiCbrCaratV2Classifier
+from csi_carat.engine.wicbr_carat import evaluate_branch_gate_diagnostics, run_wicbr_carat_epoch
+from csi_carat.models.wicbr import WiCbrCaratClassifier, WiCbrCaratV2Classifier, WiCbrCaratV3Classifier
 from scripts.train_widar3_erm_baseline import (
     _set_seed,
     _write_json,
@@ -48,9 +48,10 @@ def main(argv: list[str] | None = None) -> int:
         weight_decay=1e-4,
     )
     parser.add_argument("--backbone", choices=["resnet18", "small"], default="resnet18")
-    parser.add_argument("--carat-version", choices=["v1", "v2"], default="v1")
+    parser.add_argument("--carat-version", choices=["v1", "v2", "v3"], default="v1")
     parser.add_argument("--branch-channels", type=int, default=64)
     parser.add_argument("--factor-dim", type=int, default=32)
+    parser.add_argument("--branch-dropout", type=float, default=0.0)
     parser.add_argument("--branch-mode", choices=["both", "phase", "dfs"], default="both")
     parser.add_argument("--no-fusion", dest="use_fusion", action="store_false")
     parser.set_defaults(use_fusion=True)
@@ -60,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--disentangle-weight", type=float, default=0.1)
     parser.add_argument("--contrastive-weight", type=float, default=0.1)
     parser.add_argument("--temperature", type=float, default=0.1)
+    parser.add_argument("--phase-prior-weight", type=float, default=0.0)
+    parser.add_argument("--phase-prior-target", type=float, default=0.65)
     parser.add_argument("--source-val-fraction", type=float, default=0.1)
     parser.add_argument("--source-val-strategy", choices=["stratified", "leave_one_domain"], default="leave_one_domain")
     parser.add_argument("--source-val-domain", type=int, default=-1)
@@ -125,7 +128,17 @@ def main(argv: list[str] | None = None) -> int:
         pin_memory=args.device.startswith("cuda"),
     )
 
-    model_cls = WiCbrCaratClassifier if args.carat_version == "v1" else WiCbrCaratV2Classifier
+    model_classes = {
+        "v1": WiCbrCaratClassifier,
+        "v2": WiCbrCaratV2Classifier,
+        "v3": WiCbrCaratV3Classifier,
+    }
+    model_cls = model_classes[args.carat_version]
+    extra_model_kwargs = {}
+    if args.carat_version == "v1":
+        extra_model_kwargs = {"branch_mode": args.branch_mode, "use_fusion": args.use_fusion}
+    elif args.carat_version == "v3":
+        extra_model_kwargs = {"branch_dropout": args.branch_dropout}
     model = model_cls(
         num_classes=6,
         num_domains=len(source_domain_map),
@@ -134,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         backbone=args.backbone,
         pretrained=args.pretrained,
         train_backbone=not args.freeze_backbone,
-        **({"branch_mode": args.branch_mode, "use_fusion": args.use_fusion} if args.carat_version == "v1" else {}),
+        **extra_model_kwargs,
     ).to(args.device)
     optimizer = torch.optim.AdamW(
         (parameter for parameter in model.parameters() if parameter.requires_grad),
@@ -159,6 +172,8 @@ def main(argv: list[str] | None = None) -> int:
             disentangle_weight=args.disentangle_weight,
             contrastive_weight=args.contrastive_weight,
             temperature=args.temperature,
+            phase_prior_weight=args.phase_prior_weight,
+            phase_prior_target=args.phase_prior_target,
         )
         test_metrics = evaluate_erm(
             model,
@@ -227,6 +242,27 @@ def main(argv: list[str] | None = None) -> int:
     metrics_path = output_dir / f"{args.run_name}_metrics.json"
     report_path = output_dir / f"{args.run_name}_metrics.md"
     checkpoint_path = output_dir / f"{args.run_name}_checkpoint.pt"
+    final_state_dict = {key: value.detach().cpu() for key, value in model.state_dict().items()}
+    gate_diagnostics = {}
+    if best_state_dict is not None:
+        model.load_state_dict(best_state_dict)
+        test_gate_diagnostics = evaluate_branch_gate_diagnostics(
+            model,
+            test_loader,
+            device=args.device,
+            feature_keys=WICBR_FEATURE_KEYS,
+        )
+        if test_gate_diagnostics:
+            gate_diagnostics["test"] = test_gate_diagnostics
+        if source_val_loader is not None:
+            source_val_gate_diagnostics = evaluate_branch_gate_diagnostics(
+                model,
+                source_val_loader,
+                device=args.device,
+                feature_keys=WICBR_FEATURE_KEYS,
+            )
+            if source_val_gate_diagnostics:
+                gate_diagnostics["source_val"] = source_val_gate_diagnostics
     payload = {
         "run_name": args.run_name,
         "train_cache": str(train_cache),
@@ -237,12 +273,15 @@ def main(argv: list[str] | None = None) -> int:
         "carat_version": args.carat_version,
         "branch_mode": args.branch_mode,
         "use_fusion": args.use_fusion,
+        "branch_dropout": args.branch_dropout,
         "risk_weight": args.risk_weight,
         "risk_eta": args.risk_eta,
         "domain_weight": args.domain_weight,
         "disentangle_weight": args.disentangle_weight,
         "contrastive_weight": args.contrastive_weight,
         "temperature": args.temperature,
+        "phase_prior_weight": args.phase_prior_weight,
+        "phase_prior_target": args.phase_prior_target,
         "num_train": len(train_dataset),
         "num_fit": len(fit_dataset),
         "num_source_val": len(source_val_dataset) if source_val_dataset is not None else 0,
@@ -259,6 +298,8 @@ def main(argv: list[str] | None = None) -> int:
             metric=args.selection_metric,
         ),
     }
+    if gate_diagnostics:
+        payload["gate_diagnostics"] = gate_diagnostics
     _write_json(metrics_path, payload)
     _write_markdown(report_path, payload)
 
@@ -266,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
         torch.save(
             {
                 "model_state_dict": model.state_dict(),
+                "final_model_state_dict": final_state_dict,
                 "best_model_state_dict": best_state_dict,
                 "optimizer_state_dict": optimizer.state_dict(),
                 "metrics": payload,

@@ -409,12 +409,40 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr_carat.py \
   --output-dir results/widar3_wicbr_carat_v2
 ```
 
+Run the phase-prior Wi-CBR-CARAT v3 baseline with gate diagnostics:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/train_widar3_wicbr_carat.py \
+  --data-root /home/ccl/data/csi-carat \
+  --run-name wicbr_carat_v3 \
+  --batch-size 10 \
+  --epochs 30 \
+  --learning-rate 0.0001 \
+  --risk-weight 0.25 \
+  --risk-eta 2.0 \
+  --domain-weight 0.1 \
+  --disentangle-weight 0.1 \
+  --contrastive-weight 0.1 \
+  --phase-prior-weight 0.05 \
+  --phase-prior-target 0.65 \
+  --branch-dropout 0.2 \
+  --source-val-fraction 0.1 \
+  --source-val-strategy leave_one_domain \
+  --source-val-domain -1 \
+  --selection-split source_val \
+  --selection-metric macro_f1 \
+  --backbone resnet18 \
+  --carat-version v3 \
+  --device cuda \
+  --output-dir results/widar3_wicbr_carat_v3
+```
+
 Run the domain-8-focused LODO sweep:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python scripts/sweep_widar3_domain8_focus.py \
   --data-root /home/ccl/data/csi-carat \
-  --candidates wicbr_full,phase_only,no_fusion,wicbr_carat,wicbr_carat_v2 \
+  --candidates wicbr_full,phase_only,no_fusion,wicbr_carat,wicbr_carat_v2,wicbr_carat_v3 \
   --batch-size 10 \
   --epochs 30 \
   --learning-rate 0.0001 \
@@ -451,11 +479,13 @@ Push result reports after server runs:
 git add \
   results/widar3_wicbr_carat_v2/*_metrics.json \
   results/widar3_wicbr_carat_v2/*_metrics.md \
+  results/widar3_wicbr_carat_v3/*_metrics.json \
+  results/widar3_wicbr_carat_v3/*_metrics.md \
   results/widar3_domain8_focus_lodo_d*/*_metrics.json \
   results/widar3_domain8_focus_lodo_d*/*_metrics.md \
   results/widar3_lodo_summary/*.csv \
   results/widar3_lodo_summary/*.md
 
-git commit -m "results: add Wi-CBR CARAT v2 and LODO summary metrics"
+git commit -m "results: add Wi-CBR CARAT v3 and LODO summary metrics"
 git push origin codex/wicbr-carat-extensions
 ```
