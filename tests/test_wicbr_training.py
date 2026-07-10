@@ -14,8 +14,11 @@ from csi_carat.models.wicbr import WiCbrCaratV2Classifier
 from scripts.report_widar3_lodo_results import (
     LodoMetricRecord,
     aggregate_lodo_records,
+    build_parser as build_lodo_report_parser,
     collect_lodo_metric_records,
+    write_lodo_csv,
     write_lodo_markdown,
+    write_lodo_summary_csv,
 )
 from scripts.train_widar3_wicbr import (
     checkpoint_score,
@@ -200,6 +203,13 @@ def test_collect_lodo_metric_records_reads_selected_target_and_domain8_metrics(t
     assert records[0].run_name == "wicbr_lodo_full"
     assert records[0].target_macro_f1 == 0.80
     assert records[1].domain8_macro_f1 == 0.60
+    assert "\\" not in records[0].metrics_path
+
+
+def test_lodo_report_default_patterns_only_use_fair_domain8_sweep():
+    args = build_lodo_report_parser().parse_args([])
+
+    assert args.patterns == "widar3_domain8_focus_lodo_d*/*_metrics.json"
 
 
 def test_aggregate_lodo_records_returns_mean_and_std_by_run():
@@ -230,6 +240,24 @@ def test_write_lodo_markdown_includes_domain8_columns(tmp_path):
     assert "domain8_macro_f1" in text
     assert "target_macro_f1_mean" in text
     assert "a.json" in text
+
+
+def test_lodo_writers_use_lf_newlines(tmp_path):
+    records = [
+        LodoMetricRecord("a", 9, 1, 0.7, 0.8, 0.5, 0.5, "a.json"),
+        LodoMetricRecord("a", 10, 2, 0.8, 0.9, 0.7, 0.7, "b.json"),
+    ]
+    summary = aggregate_lodo_records(records)
+    record_csv = tmp_path / "records.csv"
+    summary_csv = tmp_path / "summary.csv"
+    markdown = tmp_path / "summary.md"
+
+    write_lodo_csv(record_csv, records)
+    write_lodo_summary_csv(summary_csv, summary)
+    write_lodo_markdown(markdown, records, summary)
+
+    for path in (record_csv, summary_csv, markdown):
+        assert b"\r\n" not in path.read_bytes()
 
 
 class _TinyFeatureDataset(torch.utils.data.Dataset):

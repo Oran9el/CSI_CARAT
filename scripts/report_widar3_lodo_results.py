@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", default="results/widar3_lodo_summary")
     parser.add_argument(
         "--patterns",
-        default="widar3_wicbr_lodo/*_metrics.json,widar3_domain8_focus_lodo_d*/*_metrics.json",
+        default="widar3_domain8_focus_lodo_d*/*_metrics.json",
     )
     return parser
 
@@ -93,7 +93,11 @@ def write_lodo_csv(path: str | Path, records: list[LodoMetricRecord]) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(LodoMetricRecord.__dataclass_fields__))
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=list(LodoMetricRecord.__dataclass_fields__),
+            lineterminator="\n",
+        )
         writer.writeheader()
         for record in records:
             writer.writerow(record.__dict__)
@@ -115,7 +119,7 @@ def write_lodo_summary_csv(path: str | Path, summary: dict[str, dict[str, float 
         "source_val_macro_f1_std",
     ]
     with output_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for run_name, values in summary.items():
             writer.writerow({"run_name": run_name, **values})
@@ -163,7 +167,7 @@ def write_lodo_markdown(
         )
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def _record_from_metrics(path: Path) -> LodoMetricRecord | None:
@@ -183,7 +187,7 @@ def _record_from_metrics(path: Path) -> LodoMetricRecord | None:
         target_macro_f1=float(test["macro_f1"]),
         worst_domain_macro_f1=float(test["worst_domain_macro_f1"]),
         domain8_macro_f1=float(domain8.get("macro_f1", test["worst_domain_macro_f1"])),
-        metrics_path=str(path),
+        metrics_path=path.as_posix(),
     )
 
 

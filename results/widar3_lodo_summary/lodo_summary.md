@@ -6,14 +6,7 @@
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | wicbr_carat_lodo | 7 | 0.831935 | 0.015936 | 0.455029 | 0.059999 | 0.455029 | 0.059999 | 0.811055 |
 | wicbr_carat_v2_lodo | 7 | 0.840234 | 0.028676 | 0.500269 | 0.070647 | 0.500269 | 0.070647 | 0.822208 |
-| wicbr_lodo_domain10 | 1 | 0.699454 | 0.000000 | 0.418532 | 0.000000 | 0.418532 | 0.000000 | 0.322314 |
-| wicbr_lodo_domain11 | 1 | 0.854712 | 0.000000 | 0.563628 | 0.000000 | 0.563628 | 0.000000 | 0.948518 |
-| wicbr_lodo_domain12 | 1 | 0.847244 | 0.000000 | 0.429412 | 0.000000 | 0.429412 | 0.000000 | 0.957309 |
-| wicbr_lodo_domain13 | 1 | 0.840528 | 0.000000 | 0.415909 | 0.000000 | 0.415909 | 0.000000 | 0.857602 |
-| wicbr_lodo_domain14 | 1 | 0.812792 | 0.000000 | 0.433256 | 0.000000 | 0.433256 | 0.000000 | 0.853893 |
-| wicbr_lodo_domain15 | 1 | 0.862070 | 0.000000 | 0.519085 | 0.000000 | 0.519085 | 0.000000 | 0.933115 |
-| wicbr_lodo_domain9 | 1 | 0.828972 | 0.000000 | 0.495899 | 0.000000 | 0.495899 | 0.000000 | 0.918670 |
-| wicbr_lodo_full | 8 | 0.825980 | 0.050356 | 0.474351 | 0.053240 | 0.474351 | 0.053240 | 0.840567 |
+| wicbr_lodo_full | 7 | 0.820824 | 0.051820 | 0.467960 | 0.053970 | 0.467960 | 0.053970 | 0.827346 |
 | wicbr_lodo_no_fusion | 7 | 0.818825 | 0.038905 | 0.488647 | 0.086990 | 0.488647 | 0.086990 | 0.807595 |
 | wicbr_lodo_phase_only | 7 | 0.811451 | 0.037605 | 0.630152 | 0.044081 | 0.630152 | 0.044081 | 0.798584 |
 
@@ -35,13 +28,6 @@
 | wicbr_carat_v2_lodo | 13 | 27 | 0.860483 | 0.841082 | 0.568618 | 0.568618 | results/widar3_domain8_focus_lodo_d13/wicbr_carat_v2_lodo_metrics.json |
 | wicbr_carat_v2_lodo | 14 | 21 | 0.862322 | 0.808234 | 0.446498 | 0.446498 | results/widar3_domain8_focus_lodo_d14/wicbr_carat_v2_lodo_metrics.json |
 | wicbr_carat_v2_lodo | 15 | 27 | 0.944736 | 0.881850 | 0.544333 | 0.544333 | results/widar3_domain8_focus_lodo_d15/wicbr_carat_v2_lodo_metrics.json |
-| wicbr_lodo_domain10 | 10 | 25 | 0.322314 | 0.699454 | 0.418532 | 0.418532 | results/widar3_wicbr_lodo/wicbr_lodo_domain10_metrics.json |
-| wicbr_lodo_domain11 | 11 | 30 | 0.948518 | 0.854712 | 0.563628 | 0.563628 | results/widar3_wicbr_lodo/wicbr_lodo_domain11_metrics.json |
-| wicbr_lodo_domain12 | 12 | 25 | 0.957309 | 0.847244 | 0.429412 | 0.429412 | results/widar3_wicbr_lodo/wicbr_lodo_domain12_metrics.json |
-| wicbr_lodo_domain13 | 13 | 25 | 0.857602 | 0.840528 | 0.415909 | 0.415909 | results/widar3_wicbr_lodo/wicbr_lodo_domain13_metrics.json |
-| wicbr_lodo_domain14 | 14 | 27 | 0.853893 | 0.812792 | 0.433256 | 0.433256 | results/widar3_wicbr_lodo/wicbr_lodo_domain14_metrics.json |
-| wicbr_lodo_domain15 | 15 | 28 | 0.933115 | 0.862070 | 0.519085 | 0.519085 | results/widar3_wicbr_lodo/wicbr_lodo_domain15_metrics.json |
-| wicbr_lodo_domain9 | 9 | 26 | 0.918670 | 0.828972 | 0.495899 | 0.495899 | results/widar3_wicbr_lodo/wicbr_lodo_domain9_metrics.json |
 | wicbr_lodo_full | 9 | 26 | 0.918670 | 0.828972 | 0.495899 | 0.495899 | results/widar3_domain8_focus_lodo_d9/wicbr_lodo_full_metrics.json |
 | wicbr_lodo_full | 10 | 25 | 0.322314 | 0.699454 | 0.418532 | 0.418532 | results/widar3_domain8_focus_lodo_d10/wicbr_lodo_full_metrics.json |
 | wicbr_lodo_full | 11 | 30 | 0.948518 | 0.854712 | 0.563628 | 0.563628 | results/widar3_domain8_focus_lodo_d11/wicbr_lodo_full_metrics.json |
@@ -49,7 +35,6 @@
 | wicbr_lodo_full | 13 | 25 | 0.857602 | 0.840528 | 0.415909 | 0.415909 | results/widar3_domain8_focus_lodo_d13/wicbr_lodo_full_metrics.json |
 | wicbr_lodo_full | 14 | 27 | 0.853893 | 0.812792 | 0.433256 | 0.433256 | results/widar3_domain8_focus_lodo_d14/wicbr_lodo_full_metrics.json |
 | wicbr_lodo_full | 15 | 28 | 0.933115 | 0.862070 | 0.519085 | 0.519085 | results/widar3_domain8_focus_lodo_d15/wicbr_lodo_full_metrics.json |
-| wicbr_lodo_full | 15 | 28 | 0.933115 | 0.862070 | 0.519085 | 0.519085 | results/widar3_wicbr_lodo/wicbr_lodo_full_metrics.json |
 | wicbr_lodo_no_fusion | 9 | 21 | 0.915815 | 0.836476 | 0.504739 | 0.504739 | results/widar3_domain8_focus_lodo_d9/wicbr_lodo_no_fusion_metrics.json |
 | wicbr_lodo_no_fusion | 10 | 25 | 0.275430 | 0.774431 | 0.396011 | 0.396011 | results/widar3_domain8_focus_lodo_d10/wicbr_lodo_no_fusion_metrics.json |
 | wicbr_lodo_no_fusion | 11 | 30 | 0.876900 | 0.829200 | 0.570669 | 0.570669 | results/widar3_domain8_focus_lodo_d11/wicbr_lodo_no_fusion_metrics.json |
