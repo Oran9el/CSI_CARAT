@@ -21,7 +21,12 @@ from csi_carat.data.widar3_dataset import WidarFeatureDataset
 from csi_carat.engine.erm import evaluate_erm
 from csi_carat.engine.wicbr import WICBR_FEATURE_KEYS
 from csi_carat.engine.wicbr_carat import evaluate_branch_gate_diagnostics, run_wicbr_carat_epoch
-from csi_carat.models.wicbr import WiCbrCaratClassifier, WiCbrCaratV2Classifier, WiCbrCaratV3Classifier
+from csi_carat.models.wicbr import (
+    WiCbrCaratClassifier,
+    WiCbrCaratV2Classifier,
+    WiCbrCaratV3Classifier,
+    WiCbrCaratV4Classifier,
+)
 from scripts.train_widar3_erm_baseline import (
     _set_seed,
     _write_json,
@@ -48,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
         weight_decay=1e-4,
     )
     parser.add_argument("--backbone", choices=["resnet18", "small"], default="resnet18")
-    parser.add_argument("--carat-version", choices=["v1", "v2", "v3"], default="v1")
+    parser.add_argument("--carat-version", choices=["v1", "v2", "v3", "v4"], default="v1")
     parser.add_argument("--branch-channels", type=int, default=64)
     parser.add_argument("--factor-dim", type=int, default=32)
     parser.add_argument("--branch-dropout", type=float, default=0.0)
@@ -63,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--temperature", type=float, default=0.1)
     parser.add_argument("--phase-prior-weight", type=float, default=0.0)
     parser.add_argument("--phase-prior-target", type=float, default=0.65)
+    parser.add_argument("--phase-aux-weight", type=float, default=0.0)
     parser.add_argument("--source-val-fraction", type=float, default=0.1)
     parser.add_argument("--source-val-strategy", choices=["stratified", "leave_one_domain"], default="leave_one_domain")
     parser.add_argument("--source-val-domain", type=int, default=-1)
@@ -132,12 +138,13 @@ def main(argv: list[str] | None = None) -> int:
         "v1": WiCbrCaratClassifier,
         "v2": WiCbrCaratV2Classifier,
         "v3": WiCbrCaratV3Classifier,
+        "v4": WiCbrCaratV4Classifier,
     }
     model_cls = model_classes[args.carat_version]
     extra_model_kwargs = {}
     if args.carat_version == "v1":
         extra_model_kwargs = {"branch_mode": args.branch_mode, "use_fusion": args.use_fusion}
-    elif args.carat_version == "v3":
+    elif args.carat_version in {"v3", "v4"}:
         extra_model_kwargs = {"branch_dropout": args.branch_dropout}
     model = model_cls(
         num_classes=6,
@@ -174,6 +181,7 @@ def main(argv: list[str] | None = None) -> int:
             temperature=args.temperature,
             phase_prior_weight=args.phase_prior_weight,
             phase_prior_target=args.phase_prior_target,
+            phase_aux_weight=args.phase_aux_weight,
         )
         test_metrics = evaluate_erm(
             model,
@@ -282,6 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         "temperature": args.temperature,
         "phase_prior_weight": args.phase_prior_weight,
         "phase_prior_target": args.phase_prior_target,
+        "phase_aux_weight": args.phase_aux_weight,
         "num_train": len(train_dataset),
         "num_fit": len(fit_dataset),
         "num_source_val": len(source_val_dataset) if source_val_dataset is not None else 0,

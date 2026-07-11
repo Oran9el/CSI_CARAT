@@ -7,6 +7,7 @@ from csi_carat.models.wicbr import (
     WiCbrCaratClassifier,
     WiCbrCaratV2Classifier,
     WiCbrCaratV3Classifier,
+    WiCbrCaratV4Classifier,
     WiCbrCnnClassifier,
     WiCbrSpatialGate,
 )
@@ -185,3 +186,29 @@ def test_wicbr_carat_v3_applies_branch_dropout_only_during_training():
     assert torch.allclose(train_outputs["gate"].sum(dim=1), torch.ones(4, 4))
     assert torch.all((train_outputs["gate"] == 0.0) | (train_outputs["gate"] == 1.0))
     assert not torch.all((eval_outputs["gate"] == 0.0) | (eval_outputs["gate"] == 1.0))
+
+
+def test_wicbr_carat_v4_mixes_fused_and_phase_logits_with_fallback_gate():
+    model = WiCbrCaratV4Classifier(
+        num_classes=6,
+        num_domains=3,
+        branch_channels=8,
+        factor_dim=4,
+    )
+    model.eval()
+
+    outputs = model(
+        wicbr_phase_image=torch.randn(3, 3, 32, 32),
+        wicbr_dfs_image=torch.randn(3, 3, 32, 32),
+        return_outputs=True,
+    )
+
+    assert outputs["fused_logits"].shape == (3, 6)
+    assert outputs["phase_logits"].shape == (3, 6)
+    assert outputs["fallback_gate"].shape == (3, 1)
+    assert torch.all((0.0 <= outputs["fallback_gate"]) & (outputs["fallback_gate"] <= 1.0))
+    expected = (
+        (1.0 - outputs["fallback_gate"]) * outputs["fused_logits"]
+        + outputs["fallback_gate"] * outputs["phase_logits"]
+    )
+    assert torch.allclose(outputs["logits"], expected)

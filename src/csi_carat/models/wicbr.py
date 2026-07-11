@@ -394,6 +394,52 @@ class WiCbrCaratV3Classifier(WiCbrCaratV2Classifier):
         super().__init__(*args, branch_dropout=branch_dropout, **kwargs)
 
 
+class WiCbrCaratV4Classifier(WiCbrCaratV3Classifier):
+    """CSI-CARAT v4 with a phase fallback head gated against fused logits."""
+
+    def __init__(self, *args, factor_dim: int = 32, **kwargs) -> None:
+        super().__init__(*args, factor_dim=factor_dim, **kwargs)
+        self.phase_classifier = nn.Linear(factor_dim, self.classifier.out_features)
+        hidden_dim = max(16, factor_dim * 2)
+        self.fallback_gate = nn.Sequential(
+            nn.Linear(self.branch_channels * 2 + factor_dim * 2, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(
+        self,
+        wicbr_phase_image: torch.Tensor,
+        wicbr_dfs_image: torch.Tensor,
+        return_outputs: bool = False,
+    ) -> torch.Tensor | dict[str, torch.Tensor | dict[str, torch.Tensor]]:
+        outputs = super().forward(wicbr_phase_image, wicbr_dfs_image, return_outputs=True)
+        fused_logits = outputs["logits"]
+        phase_action = outputs["branch_factors"]["phase"]["action"]
+        phase_logits = self.phase_classifier(phase_action) / self.temperature.clamp_min(1e-6)
+        fallback_features = torch.cat(
+            [
+                outputs["features"],
+                outputs["fused"],
+                phase_action,
+            ],
+            dim=1,
+        )
+        fallback_gate = self.fallback_gate(fallback_features)
+        logits = (1.0 - fallback_gate) * fused_logits + fallback_gate * phase_logits
+        outputs = {
+            **outputs,
+            "fused_logits": fused_logits,
+            "phase_logits": phase_logits,
+            "fallback_gate": fallback_gate,
+            "logits": logits,
+        }
+        if not return_outputs:
+            return logits
+        return outputs
+
+
 class _SmallImageBranchEncoder(nn.Module):
     def __init__(self, output_channels: int) -> None:
         super().__init__()

@@ -11,7 +11,7 @@ from csi_carat.engine.wicbr_carat import (
     train_one_wicbr_carat_step,
 )
 from csi_carat.models.wicbr import WiCbrCaratClassifier
-from csi_carat.models.wicbr import WiCbrCaratV2Classifier, WiCbrCaratV3Classifier
+from csi_carat.models.wicbr import WiCbrCaratV2Classifier, WiCbrCaratV3Classifier, WiCbrCaratV4Classifier
 from scripts.report_widar3_lodo_results import (
     LodoMetricRecord,
     aggregate_lodo_records,
@@ -118,7 +118,7 @@ def test_build_ablation_specs_maps_names_to_training_arguments():
 
 
 def test_build_domain8_specs_includes_fair_baseline_and_domain8_candidates():
-    specs = build_domain8_specs(parse_candidate_names("wicbr_full,phase_only,no_fusion,wicbr_carat,wicbr_carat_v2,wicbr_carat_v3"))
+    specs = build_domain8_specs(parse_candidate_names("wicbr_full,phase_only,no_fusion,wicbr_carat,wicbr_carat_v2,wicbr_carat_v3,wicbr_carat_v4"))
 
     by_name = {spec.run_name: spec for spec in specs}
     assert by_name["wicbr_lodo_full"].script == "scripts/train_widar3_wicbr.py"
@@ -128,6 +128,8 @@ def test_build_domain8_specs_includes_fair_baseline_and_domain8_candidates():
     assert by_name["wicbr_carat_v2_lodo"].extra_args == ("--carat-version", "v2")
     assert "--carat-version" in by_name["wicbr_carat_v3_lodo"].extra_args
     assert "v3" in by_name["wicbr_carat_v3_lodo"].extra_args
+    assert "--carat-version" in by_name["wicbr_carat_v4_lodo"].extra_args
+    assert "v4" in by_name["wicbr_carat_v4_lodo"].extra_args
 
 
 def test_train_one_wicbr_carat_step_reports_loss_parts_and_updates_parameters():
@@ -154,6 +156,7 @@ def test_train_one_wicbr_carat_step_reports_loss_parts_and_updates_parameters():
         "disentangle_loss",
         "contrastive_loss",
         "phase_prior_loss",
+        "phase_aux_loss",
     }
     assert torch.isfinite(metrics["loss"])
     assert not torch.allclose(before, model.classifier.weight.detach())
@@ -200,8 +203,30 @@ def test_train_one_wicbr_carat_step_reports_phase_prior_for_v3_model():
     assert torch.isfinite(metrics["phase_prior_loss"])
 
 
+def test_train_one_wicbr_carat_step_reports_phase_aux_for_v4_model():
+    model = WiCbrCaratV4Classifier(num_classes=6, num_domains=2, branch_channels=8, factor_dim=4)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    batch = _wicbr_batch()
+
+    metrics = train_one_wicbr_carat_step(
+        model,
+        batch,
+        optimizer,
+        risk_weight=0.2,
+        domain_weight=0.1,
+        disentangle_weight=0.1,
+        contrastive_weight=0.1,
+        phase_prior_weight=0.1,
+        phase_prior_target=0.75,
+        phase_aux_weight=0.2,
+    )
+
+    assert "phase_aux_loss" in metrics
+    assert torch.isfinite(metrics["phase_aux_loss"])
+
+
 def test_evaluate_branch_gate_diagnostics_reports_overall_and_per_domain_means():
-    model = WiCbrCaratV3Classifier(num_classes=6, num_domains=2, branch_channels=8, factor_dim=4)
+    model = WiCbrCaratV4Classifier(num_classes=6, num_domains=2, branch_channels=8, factor_dim=4)
     batch = _wicbr_batch()
     dataloader = torch.utils.data.DataLoader([batch], batch_size=None)
 
@@ -210,6 +235,7 @@ def test_evaluate_branch_gate_diagnostics_reports_overall_and_per_domain_means()
     assert diagnostics["overall"]["samples"] == 4
     assert 0.0 <= diagnostics["overall"]["phase_gate_mean"] <= 1.0
     assert 0.0 <= diagnostics["overall"]["dfs_gate_mean"] <= 1.0
+    assert 0.0 <= diagnostics["overall"]["fallback_gate_mean"] <= 1.0
     assert set(diagnostics["per_domain"]) == {"0", "1"}
 
 

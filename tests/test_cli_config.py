@@ -24,6 +24,7 @@ def test_widar_config_exists_and_points_to_server_root():
     assert "domain8_focus" in text
     assert "wicbr_carat_v2" in text
     assert "wicbr_carat_v3" in text
+    assert "wicbr_carat_v4" in text
 
 
 def test_scripts_are_importable():
